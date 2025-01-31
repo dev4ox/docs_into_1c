@@ -1,13 +1,16 @@
 import pandas as pd
-import docx
-from openpyxl import load_workbook
-import os
-import re
 from pathlib import Path
+import importlib.util
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+SETTINGS_PATH = BASE_DIR / "settings.py"
 
-class StructuredXlsParser:
-    PRODUCT_NAMES = ["Светильник", "Прожектор", "Лампа", "Осветительный прибор"]
+spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
+settings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(settings)
+
+class StructuredXlsmParser:
+    PRODUCT_NAMES = settings.product_names
 
     def __init__(self, file_path):
         self.file_path = Path(file_path)
@@ -15,7 +18,7 @@ class StructuredXlsParser:
 
     def parse_xls(self):
         print(f"Opening file: {self.file_path}")
-        df = pd.read_excel(self.file_path, header=None, engine='xlrd')  # Загружаем файл XLS
+        df = pd.read_excel(self.file_path, header=None, engine='openpyxl')  # Загружаем файл XLS
 
         # Найти столбец с "Наименование"
         name_column = None
@@ -44,7 +47,8 @@ class StructuredXlsParser:
                 continue
 
             cell_value = str(row[name_column]).strip().replace("\t", " ")
-            char_value = str(row[name_column + 1]).strip().replace("\t", " ").replace("\n", ";")
+            char_value = (str(row[name_column + 1]).strip().replace("\t", " ").replace("\n", ";") + ' ' +
+                          str(row[name_column + 2]).strip().replace("\t", " ").replace("\n", ";"))
 
             if any(name.lower() in cell_value.lower() for name in self.PRODUCT_NAMES):
                 if current_product:
@@ -73,6 +77,6 @@ class StructuredXlsParser:
 
 
 # Использование
-file_path = Path("..", "test_data", "input", "ТЗ для Ростов.xls")  # Конкретный файл XLS
-parser = StructuredXlsParser(file_path)
+file_path = Path("..", "..", "test_data", "input", "ТЗ для Рос Тюм.xlsm")  # Конкретный файл XLS
+parser = StructuredXlsmParser(file_path)
 parser.process()

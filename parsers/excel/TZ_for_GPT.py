@@ -1,15 +1,17 @@
 import pandas as pd
-import docx
-from openpyxl import load_workbook
-import os
-import re
 from pathlib import Path
+import importlib.util
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+SETTINGS_PATH = BASE_DIR / "settings.py"
+
+spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
+settings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(settings)
 
 
-class StructuredExcelParser:
-    PRODUCT_NAMES = [
-        "Светильник", "Прожектор", "Лампа", "Осветительный прибор"
-    ]
+class StructuredXlsxParser:
+    PRODUCT_NAMES = settings.product_names
 
     def __init__(self, file_path):
         self.file_path = Path(file_path)
@@ -57,6 +59,6 @@ class StructuredExcelParser:
 
 
 # Использование
-file_path = Path("..", "test_data", "input", "ТЗ для GPT.xlsx")  # Конкретный файл Excel
-parser = StructuredExcelParser(file_path)
+file_path = Path("..", "..", "test_data", "input", "ТЗ для GPT.xlsx")  # Конкретный файл Excel
+parser = StructuredXlsxParser(file_path)
 parser.process()

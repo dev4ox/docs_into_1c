@@ -1,36 +1,42 @@
 import pandas as pd
-import docx
-from openpyxl import load_workbook
-import os
-import re
 from pathlib import Path
+import importlib.util
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+SETTINGS_PATH = BASE_DIR / "settings.py"
+
+spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
+settings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(settings)
 
 
-class StructuredXlsxParser:
-    PRODUCT_NAMES = ["Светильник", "Прожектор", "Лампа", "Осветительный прибор"]
+class StructuredXlsParser:
+    PRODUCT_NAMES = settings.product_names
 
     def __init__(self, file_path):
         self.file_path = Path(file_path)
         self.data = []
 
-    def parse_xlsx(self):
+    def parse_xls(self):
         print(f"Opening file: {self.file_path}")
-        df = pd.read_excel(self.file_path, header=None, engine='openpyxl')  # Загружаем весь файл
+        df = pd.read_excel(self.file_path, header=None, engine='xlrd')  # Загружаем файл XLS
 
-        # Найти столбец, содержащий "Наименование"
+        # Найти столбец с "Наименование"
         name_column = None
+        characteristics_column = None
         for col in df.columns:
-            for row_idx in range(min(15, len(df))):  # Проверяем первые 10 строк
+            for row_idx in range(min(15, len(df))):  # Проверяем первые 15 строк
                 cell_value = str(df.iloc[row_idx, col]).lower() if pd.notna(df.iloc[row_idx, col]) else ""
                 if "наименование" in cell_value:
                     name_column = col
-                    print(f"Found 'Наименование' column at index {col}")  # Отладочный вывод
+                    characteristics_column = col + 1  # Предполагаем, что характеристики справа
+                    print(f"Found 'Наименование' column at index {col}")
                     break
             if name_column is not None:
                 break
 
-        if name_column is None:
-            print("Column 'Наименование' not found!")
+        if name_column is None or characteristics_column is None:
+            print("Column 'Наименование' or characteristics column not found!")
             return
 
         current_product = None
@@ -41,15 +47,15 @@ class StructuredXlsxParser:
             if pd.isna(row[name_column]):
                 continue
 
-            cell_value = str(row[name_column]).strip()
+            cell_value = str(row[name_column]).strip().replace("\t", " ")
+            char_value = str(row[name_column + 1]).strip().replace("\t", " ").replace("\n", ";")
 
             if any(name.lower() in cell_value.lower() for name in self.PRODUCT_NAMES):
                 if current_product:
                     self.data.append(product_data)
                 current_product = cell_value
-                product_data = {"0": current_product}
-            elif current_product:
-                product_data[f"{len(product_data)}"] = cell_value
+                current_property = char_value
+                product_data = {"0": current_product, "1": current_property}
 
         if current_product:
             self.data.append(product_data)
@@ -66,11 +72,11 @@ class StructuredXlsxParser:
             return
 
         print(f"Processing file: {self.file_path.name}")
-        self.parse_xlsx()
+        self.parse_xls()
         self.print_data()
 
 
 # Использование
-file_path = Path("..", "test_data", "input", "ТЗ для 213054.xlsx")  # Конкретный файл XLSX
-parser = StructuredXlsxParser(file_path)
+file_path = Path("..", "..", "test_data", "input", "ТЗ для Ростов.xls")  # Конкретный файл XLS
+parser = StructuredXlsParser(file_path)
 parser.process()

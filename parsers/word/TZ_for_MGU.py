@@ -1,12 +1,19 @@
-import pandas as pd
 import docx
-from openpyxl import load_workbook
-import os
 import re
 from pathlib import Path
+import importlib.util
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+SETTINGS_PATH = BASE_DIR / "settings.py"
+
+spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
+settings = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(settings)
 
 
 class StructuredDocxParser:
+    PRODUCT_NAMES = settings.product_names
+
     def __init__(self, file_path):
         self.file_path = Path(file_path)
         self.data = []
@@ -22,11 +29,12 @@ class StructuredDocxParser:
         for table in doc.tables:
             for row in table.rows:
                 row_text = [cell.text.strip().replace("\n", " ") for cell in row.cells]
-                row_combined = " | ".join(row_text)  # Разделяем ячейки для наглядности
-                print(f"Row text: {row_combined}")  # Отладочный вывод
+                row_combined = " | ".join(row_text)
+                # print(f"Row text: {row_combined}")  # Отладочный вывод
 
                 # Проверяем, является ли строка номером нового товара (пример: 2.5)
                 if re.match(r"^\d+\.\d+$", row_text[0]):
+                    # !!! ПРОБЛЕМЫ С ПРОВЕРКОЙ ИМЕНИ !!!
                     if current_product:
                         all_data.append(product_data)
                     current_product = row_combined
@@ -58,7 +66,6 @@ class StructuredDocxParser:
         self.print_data()
 
 
-# Использование
-file_path = Path("..", "test_data", "input", "ТЗ для МГУ.docx")  # Конкретный файл DOCX
+file_path = Path("..", "..", "test_data", "input", "ТЗ для МГУ.docx")  # Конкретный файл DOCX
 parser = StructuredDocxParser(file_path)
 parser.process()
