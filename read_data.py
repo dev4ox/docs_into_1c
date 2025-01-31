@@ -1,8 +1,4 @@
 import pandas as pd
-import docx
-from openpyxl import load_workbook
-import os
-import re
 from pathlib import Path
 
 
