@@ -50,5 +50,5 @@ class StructuredDocxParser:
 
 # Использование
 file_path = Path("..", "..", "test_data", "input", "ТЗ для Туапсе.docx")  # Конкретный файл DOC
-parser = StructuredDocParser(file_path)
+parser = StructuredDocxParser(file_path)
 parser.process()
