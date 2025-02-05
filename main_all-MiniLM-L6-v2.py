@@ -1,7 +1,10 @@
+import os
 import pandas as pd
 from pathlib import Path
 import importlib.util
 from sentence_transformers import SentenceTransformer, util
+from openpyxl import load_workbook, Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 # Загрузка настроек из settings.py
 BASE_DIR = Path(__file__).resolve().parent
@@ -10,6 +13,7 @@ SETTINGS_PATH = BASE_DIR / "settings.py"
 spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
 settings = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(settings)
+
 
 # -------------- Класс для объединённого парсинга Excel ---------------
 class UnifiedExcelParser:
@@ -240,12 +244,32 @@ class FormFiller:
         return form
 
 
+# ---------------- Функция для добавления данных в output.xlsx ----------------
+def append_df_to_excel(filename, df, sheet_name='Sheet1'):
+    """
+    Если файл filename существует, функция находит последнюю заполненную строку
+    и добавляет новые данные (без заголовков). Если файла нет, создается новый Excel-файл с заголовками.
+    """
+    if os.path.exists(filename):
+        wb = load_workbook(filename)
+        if sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+        else:
+            ws = wb.active
+        # Преобразуем DataFrame в строки без заголовков
+        for row in dataframe_to_rows(df, index=False, header=False):
+            ws.append(row)
+        wb.save(filename)
+    else:
+        df.to_excel(filename, index=False, sheet_name=sheet_name)
+
+
 # -------------- Парсинг файла и заполнение формы ---------------
 if __name__ == "__main__":
     # Путь к входящему файлу (пример: "ТЗ для GPT.xlsx")
-    file_path = Path("test_data", "input", "ТЗ для GPT.xlsx")
-    parser = UnifiedExcelParser(file_path)
-    parser.process()  # выводит отладочную информацию и список разобранных товаров
+    input_file_path = Path("test_data", "input", "ТЗ для GPT.xlsx")
+    parser = UnifiedExcelParser(input_file_path)
+    parser.process()
 
     filler = FormFiller()
     filled_forms = []
@@ -253,7 +277,11 @@ if __name__ == "__main__":
         form = filler.fill_form(product)
         filled_forms.append(form)
 
-    # Вывод результата в виде таблицы с требуемыми столбцами
     df_form = pd.DataFrame(filled_forms, columns=filler.columns)
     print("\nЗаполненная форма:")
     print(df_form.to_string(index=False))
+
+    # Запись в output.xlsx: если файл существует, добавляем новые строки после последней заполненной строки.
+    output_file = "output.xlsx"
+    append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
+    print(f"\nДанные успешно добавлены в файл {output_file}.")
