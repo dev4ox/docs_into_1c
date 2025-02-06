@@ -6,6 +6,7 @@ import importlib.util
 from llama_cpp import Llama
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
+# from parsers.pdf import TZ_for_RIR, TZ_for_NIIAR
 
 BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_PATH = BASE_DIR / "settings.py"
@@ -13,7 +14,12 @@ spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
 settings = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(settings)
 
-llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M.gguf", n_gpu_layers=100)
+llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M.gguf",
+            n_gpu_layers=-1,
+            n_ctx=2048)
+
+# llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M.gguf",
+#             n_ctx=2048)
 
 initial_prompt = """You are an expert data extractor specialized in processing technical descriptions of lighting fixtures.
 The input is a single-line text containing all information about one product. The text may include approximate values, ranges, and qualifiers such as "не более", "не менее", "+-", etc.
@@ -24,9 +30,10 @@ If no information is found for a field, output "не указано".
 Return only the JSON object.
 """
 
+
 def extract_with_qwen(text):
     prompt = initial_prompt + "\n\nText:\n" + text + "\n\nExtracted JSON:"
-    output = llm(prompt=prompt, max_tokens=300, temperature=0.0)
+    output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
     result_text = output["choices"][0]["text"].strip()
     try:
         data = json.loads(result_text)
@@ -35,6 +42,7 @@ def extract_with_qwen(text):
         print("Raw output:", result_text)
         data = {}
     return data
+
 
 def append_df_to_excel(filename, df, sheet_name='Sheet1'):
     if os.path.exists(filename):
@@ -46,13 +54,17 @@ def append_df_to_excel(filename, df, sheet_name='Sheet1'):
     else:
         df.to_excel(filename, index=False, sheet_name=sheet_name)
 
+
 class UnifiedExcelParser:
     PRODUCT_NAMES = settings.product_names
+
     def __init__(self, file_path):
         self.file_path = Path(file_path)
         self.data = []
+
     def is_product_name(self, text):
         return any(text.lower().startswith(name.lower()) for name in self.PRODUCT_NAMES)
+
     def detect_engine(self):
         ext = self.file_path.suffix.lower()
         if ext in ['.xlsx', '.xlsm']:
@@ -61,6 +73,7 @@ class UnifiedExcelParser:
             return 'xlrd'
         else:
             return 'openpyxl'
+
     def parse_excel(self):
         if not self.file_path.exists():
             print(f"File not found: {self.file_path}")
@@ -84,6 +97,7 @@ class UnifiedExcelParser:
             else:
                 extra_char = (name_column + 2 < df.shape[1])
                 self.parse_multi_column(df, name_column, extra_char)
+
     def parse_single_column(self, df):
         current_text = ""
         for index, row in df.iterrows():
@@ -96,6 +110,7 @@ class UnifiedExcelParser:
                 current_text += " " + cell_value
         if current_text:
             self.data.append({"text": current_text})
+
     def parse_multi_column(self, df, name_column, extra_char):
         current_text = ""
         for index, row in df.iterrows():
@@ -118,13 +133,17 @@ class UnifiedExcelParser:
             else:
                 current_text += " " + cell_value + char_value
         if current_text:
+            print(current_text)
             self.data.append({"text": current_text})
+
     def process(self):
         self.parse_excel()
+
 
 if __name__ == "__main__":
     input_file_path = Path("test_data", "input", "ТЗ для GPT.xlsx")
     parser = UnifiedExcelParser(input_file_path)
+    # parser = TZ_for_RIR.StructuredPdfParser(Path("test_data", "input", "ТЗ для РИР.pdf"))
     parser.process()
     filled_forms = []
     final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
