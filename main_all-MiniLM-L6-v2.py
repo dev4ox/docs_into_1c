@@ -244,24 +244,6 @@ class FormFiller:
         return form
 
 
-# ---------------- Функция для добавления данных в output.xlsx ----------------
-def append_df_to_excel(filename, df, sheet_name='Sheet1'):
-    """
-    Если файл filename существует, функция находит последнюю заполненную строку
-    и добавляет новые данные (без заголовков). Если файла нет, создается новый Excel-файл с заголовками.
-    """
-    if os.path.exists(filename):
-        wb = load_workbook(filename)
-        if sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
-        else:
-            ws = wb.active
-        # Преобразуем DataFrame в строки без заголовков
-        for row in dataframe_to_rows(df, index=False, header=False):
-            ws.append(row)
-        wb.save(filename)
-    else:
-        df.to_excel(filename, index=False, sheet_name=sheet_name)
 
 
 # -------------- Парсинг файла и заполнение формы ---------------

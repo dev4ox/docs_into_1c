@@ -75,19 +75,18 @@ class UnifiedExcelParser:
         Каждая строка проверяется на то, является ли она названием нового товара.
         """
         current_product = None
-        product_data = {}
+        product_line = ""
         for index, row in df.iterrows():
             cell_value = str(row[0]).strip()
             if self.is_product_name(cell_value):
                 if current_product:
-                    self.data.append(product_data)
+                    self.data.append(product_line)
                 current_product = cell_value
-                product_data = {"0": current_product}
+                product_line = current_product
             else:
-                # Нумеруем последующие строки, добавляя их в словарь
-                product_data[f"{len(product_data)}"] = cell_value
+                product_line += f" {cell_value}"  # Добавляем текст в одну строку
         if current_product:
-            self.data.append(product_data)
+            self.data.append(product_line)
 
     def parse_multi_column(self, df, name_column, extra_char):
         """
@@ -95,14 +94,13 @@ class UnifiedExcelParser:
         Если extra_char==True – предполагается, что характеристики распределены на два столбца.
         """
         current_product = None
-        product_data = {}
+        product_line = ""
         for index, row in df.iterrows():
             if pd.isna(row[name_column]):
                 continue
             cell_value = str(row[name_column]).strip().replace("\t", " ")
             char_value = ""
             if extra_char:
-                # Если имеется два столбца с характеристиками
                 if name_column + 1 < df.shape[1]:
                     char_value += str(row[name_column + 1]).strip().replace("\t", " ").replace("\n", ";")
                 if name_column + 2 < df.shape[1]:
@@ -110,18 +108,18 @@ class UnifiedExcelParser:
             else:
                 if name_column + 1 < df.shape[1]:
                     char_value = str(row[name_column + 1]).strip().replace("\t", " ").replace("\n", ";")
+
             if any(name.lower() in cell_value.lower() for name in self.PRODUCT_NAMES):
                 if current_product:
-                    self.data.append(product_data)
+                    self.data.append(product_line)
                 current_product = cell_value
-                product_data = {"0": current_product}
+                product_line = current_product
                 if char_value:
-                    product_data["1"] = char_value
+                    product_line += f" {char_value}"
             else:
-                # Добавляем дополнительную информацию, используя следующую свободную нумерацию ключей
-                product_data[f"{len(product_data)}"] = cell_value
+                product_line += f" {cell_value}"  # Добавляем дополнительную информацию в строку
         if current_product:
-            self.data.append(product_data)
+            self.data.append(product_line)
 
     def print_data(self):
         """Вывод полученных данных."""

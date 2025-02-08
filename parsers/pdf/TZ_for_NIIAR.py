@@ -2,6 +2,7 @@ import pdfplumber
 from pathlib import Path
 import importlib.util
 
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 SETTINGS_PATH = BASE_DIR / "settings.py"
 

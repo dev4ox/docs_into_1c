@@ -6,7 +6,6 @@ import importlib.util
 from llama_cpp import Llama
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
-# from parsers.pdf import TZ_for_RIR, TZ_for_NIIAR
 
 BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_PATH = BASE_DIR / "settings.py"
@@ -14,27 +13,31 @@ spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
 settings = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(settings)
 
-llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M.gguf",
-            n_gpu_layers=-1,
-            n_ctx=2048)
 
-# llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M.gguf",
-#             n_ctx=2048)
-
-initial_prompt = """You are an expert data extractor specialized in processing technical descriptions of lighting fixtures.
-The input is a single-line text containing all information about one product. The text may include approximate values, ranges, and qualifiers such as "не более", "не менее", "+-", etc.
-Extract the following fields and output a valid JSON object with exactly these keys:
-"Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм", "Ширина, мм", "Высота, мм", "Рассеиватель", "Цвет. температура, К", "Вес, кг", "Напряжение, В", "Температура эксплуатации", "Срок службы (работы) светильника", "Тип КСС", "Род тока", "Гарантия", "Индекс цветопередачи (CRI, Ra)", "Цвет корпуса", "Коэффициент пульсаций", "Коэффициент мощности (Pf)", "Класс взрывозащиты (Ex)", "Класс пожароопасности", "Класс защиты от поражения электрическим током", "Материал корпуса", "Тип", "Прочее".
-For parameters expressed as ranges (e.g. "от X до Y", "X ÷ Y") or with qualifiers ("не более", "не менее"), include the entire expression as found.
-If no information is found for a field, output "не указано".
-Return only the JSON object.
-"""
-
-
-def extract_with_qwen(text):
+def extract_with_qwen(text, initial_prompt):
+    llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M.gguf",
+                n_ctx=2048)
     prompt = initial_prompt + "\n\nText:\n" + text + "\n\nExtracted JSON:"
     output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
     result_text = output["choices"][0]["text"].strip()
+    try:
+        data = json.loads(result_text)
+    except Exception as e:
+        print("Error parsing JSON:", e)
+        print("Raw output:", result_text)
+        data = {}
+    return data
+
+
+def extract_with_mistral(text, initial_prompt):
+    llm = Llama(
+        model_path="models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+        n_ctx=3072
+    )
+    prompt = initial_prompt + "\n\nДанные для обработки:\n" + text
+    output = llm(prompt=prompt, max_tokens=1024, temperature=0.2)
+    result_text = output["choices"][0]["text"].strip()
+    print(result_text)
     try:
         data = json.loads(result_text)
     except Exception as e:
@@ -138,31 +141,3 @@ class UnifiedExcelParser:
 
     def process(self):
         self.parse_excel()
-
-
-if __name__ == "__main__":
-    input_file_path = Path("test_data", "input", "ТЗ для GPT.xlsx")
-    parser = UnifiedExcelParser(input_file_path)
-    # parser = TZ_for_RIR.StructuredPdfParser(Path("test_data", "input", "ТЗ для РИР.pdf"))
-    parser.process()
-    filled_forms = []
-    final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
-                     "Ширина, мм", "Высота, мм", "Рассеиватель", "Цвет. температура, К", "Вес, кг",
-                     "Напряжение, В", "Температура эксплуатации", "Срок службы (работы) светильника",
-                     "Тип КСС", "Род тока", "Гарантия", "Индекс цветопередачи (CRI, Ra)", "Цвет корпуса",
-                     "Коэффициент пульсаций", "Коэффициент мощности (Pf)", "Класс взрывозащиты (Ex)",
-                     "Класс пожароопасности", "Класс защиты от поражения электрическим током",
-                     "Материал корпуса", "Тип", "Прочее"]
-    for product in parser.data:
-        product_text = product["text"]
-        extracted = extract_with_qwen(product_text)
-        for col in final_columns:
-            if col not in extracted:
-                extracted[col] = "не указано"
-        filled_forms.append(extracted)
-    df_form = pd.DataFrame(filled_forms, columns=final_columns)
-    print("\nЗаполненная форма:")
-    print(df_form.to_string(index=False))
-    output_file = "output.xlsx"
-    append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
-    print(f"\nДанные успешно добавлены в файл {output_file}.")
