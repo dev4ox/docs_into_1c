@@ -33,7 +33,7 @@ class StructuredPdfParser:
 
                         # Проверяем, содержится ли в строке название товара
                         if any(name.lower() in row_combined.lower() for name in self.PRODUCT_NAMES):
-                            product_data = {"0": row_combined}
+                            product_data = {"text": row_combined}
                             self.data.append(product_data)
 
     def print_data(self):
