@@ -4,7 +4,7 @@ import run_models
 import settings
 
 if __name__ == "__main__":
-    input_file_path = Path("test_data", "input", "ТЗ для НИИАР поз №158.pdf")
+    input_file_path = Path("test_data", "input", "ТЗ для РИР.pdf")
     input_prompt = '''
 задача – проанализировать входной текст и извлечь параметры для заполнения таблицы "Форма 2".
 Выводи ровно один JSON-словарь с ключами (значения выводи как строки):
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 }
 Return only the JSON object.
     '''
-    parser = run_models.StructuredPdfParser(input_file_path)
+    parser = run_models.StructuredPdfParser2(input_file_path)
     parser.process()
     final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
                      "Ширина, мм", "Высота, мм", "Рассеиватель", "Цвет. температура, К", "Вес, кг",
@@ -81,6 +81,6 @@ Return only the JSON object.
     print("\nЗаполненная форма:")
     print(df_form.to_string(index=False))
 
-    output_file = "output2.xlsx"
+    output_file = "output3.xlsx"
     run_models.append_df_to_excel(output_file, df_form, sheet_name="Лист1")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
