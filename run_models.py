@@ -14,12 +14,33 @@ settings = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(settings)
 
 
-def extract_with_qwen(text, initial_prompt):
-    llm = Llama(model_path="models/Qwen2.5-7B-Instruct-1M.gguf",
-                n_ctx=2048)
-    prompt = initial_prompt + "\n\nText:\n" + text + "\n\nExtracted JSON:"
-    output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
+def extract_gemma_2_2b_it_IQ3_M(text, initial_prompt):
+    llm = Llama(
+        model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-IQ3_M.gguf",
+        n_ctx=3072
+    )
+    prompt = initial_prompt + "\n\nДанные для обработки:\n" + text
+    output = llm(prompt=prompt, max_tokens=1024, temperature=0.1)
     result_text = output["choices"][0]["text"].strip()
+    print(result_text)
+    try:
+        data = json.loads(result_text)
+    except Exception as e:
+        print("Error parsing JSON:", e)
+        print("Raw output:", result_text)
+        data = {}
+    return data
+
+
+def extract_gemma_2_2b_it_Q6_K(text, initial_prompt):
+    llm = Llama(
+        model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q6_K.gguf",
+        n_ctx=3072
+    )
+    prompt = initial_prompt + "\n\nДанные для обработки:\n" + text
+    output = llm(prompt=prompt, max_tokens=1024, temperature=0.1)
+    result_text = output["choices"][0]["text"].strip()
+    print(result_text)
     try:
         data = json.loads(result_text)
     except Exception as e:
@@ -31,11 +52,11 @@ def extract_with_qwen(text, initial_prompt):
 
 def extract_with_mistral(text, initial_prompt):
     llm = Llama(
-        model_path="models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+        model_path="../../.lmstudio/models/lmstudio-community/Mistral-7B-Instruct-v0.3-GGUF/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
         n_ctx=3072
     )
     prompt = initial_prompt + "\n\nДанные для обработки:\n" + text
-    output = llm(prompt=prompt, max_tokens=1024, temperature=0.2)
+    output = llm(prompt=prompt, max_tokens=1024, temperature=0.1)
     result_text = output["choices"][0]["text"].strip()
     print(result_text)
     try:
