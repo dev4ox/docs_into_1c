@@ -21,7 +21,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, initial_prompt, final_columns):
         model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-IQ3_M.gguf",
         n_ctx=4096,
         n_gpu_layers=-1,
-        verbose=False,
+        
     )
     prompt = initial_prompt + "\n\nText:\n" + text + "\n\nJSON:"
     output = llm(prompt=prompt, max_tokens=512, temperature=0.0)

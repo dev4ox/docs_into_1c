@@ -4,6 +4,7 @@ import run_models
 import settings
 
 if __name__ == "__main__":
+    output_file = "output_11.xlsx"
     input_file_path = Path("test_data", "input", "ТЗ для РИР.pdf")
     input_prompt = '''
 задача – проанализировать входной текст и извлечь параметры для заполнения таблицы "Форма 2".
@@ -81,6 +82,5 @@ Return only the JSON object.
     print("\nЗаполненная форма:")
     print(df_form.to_string(index=False))
 
-    output_file = "output3.xlsx"
     run_models.append_df_to_excel(output_file, df_form, sheet_name="Лист1")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
