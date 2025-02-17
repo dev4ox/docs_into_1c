@@ -1,7 +1,5 @@
 import os
 
-from numpy.ma.core import product
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # product_names = ["Светильник", "Прожектор", "Лампа", "Осветительный прибор", "Лам. ", "Фонарь", "Огонь заградительный"]
