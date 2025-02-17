@@ -43,7 +43,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         # parser = run_models.(input_file_path)
         pass
     elif ext == ".pdf":
-        parser = run_models.StructuredPdfParser2(input_file_path)
+        parser = run_models.StructuredPdfParser3(input_file_path)
         parser.process()
     else:
         return templates.TemplateResponse("index.html",
@@ -53,7 +53,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     for product in parser.data:
         product_text = product["text"]
         print(f"Распознанный товар: {product_text=}")
-        extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+        # extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+        extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
 
         if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
             extracted = {col: "не указано" for col in final_columns}
@@ -66,9 +67,9 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         filled_forms.append(extracted)
 
     df_form = pd.DataFrame(filled_forms, columns=final_columns)
-    output_folder = Path("output")
+    output_folder = Path("downloads")
     output_folder.mkdir(exist_ok=True)
-    output_file = output_folder / run_models.generate_filename(ext)
+    output_file = output_folder / run_models.generate_filename()
     if not output_file.exists():
         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
     run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
@@ -82,7 +83,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
 # Эндпоинт для скачивания файла
 @app.get("/download/{filename}", response_class=FileResponse)
 async def download_file(filename: str):
-    file_path = Path("output") / filename
+    file_path = Path("downloads") / filename
     if not file_path.exists():
         return {"error": "Файл не найден"}
-    return FileResponse(path=file_path, filename="Форма_2.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return FileResponse(path=file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

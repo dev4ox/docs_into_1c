@@ -263,7 +263,7 @@ if __name__ == "__main__":
     print("\nЗаполненная форма:")
     print(df_form.to_string(index=False))
 
-    # Запись в output.xlsx: если файл существует, добавляем новые строки после последней заполненной строки.
-    output_file = "output.xlsx"
+    # Запись в downloads.xlsx: если файл существует, добавляем новые строки после последней заполненной строки.
+    output_file = "downloads.xlsx"
     append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
