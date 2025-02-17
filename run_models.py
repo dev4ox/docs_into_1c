@@ -3,27 +3,68 @@ import json
 from llama_cpp import Llama
 import pandas as pd
 from pathlib import Path
-import importlib.util
 import re
 import pdfplumber
 import collections
+import settings
 
 
-BASE_DIR = Path(__file__).resolve().parent
-SETTINGS_PATH = BASE_DIR / "settings.py"
-spec = importlib.util.spec_from_file_location("settings", SETTINGS_PATH)
-settings = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(settings)
+input_prompt = '''
+задача – проанализировать входной текст и извлечь параметры для заполнения таблицы "Форма 2".
+Выводи ровно один JSON-словарь с ключами (значения выводи как строки):
+"Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Длина, мм", "Ширина, мм", "Высота, мм", "Габариты", "Рассеиватель", "Цвет. температура, К", "Вес, кг", "Напряжение, В", "Срок службы (работы) светильника", "Температура эксплуатации", "Материал корпуса", "Тип", "Тип КСС", "Род тока", "Гарантия", "Индекс цветопередачи (CRI, Ra)", "Класс защиты от поражения электрическим током", "Коэффициент мощности (Pf)", "С регулятором яркости (диммирование)", "Ударопрочность", "Класс взрывозащиты (Ex)", "Класс пожароопасности", "Цвет корпуса", "Коэффициент пульсаций", "Прочее".
+
+Если значение выражено диапазоном или с квалификаторами (например, "не более", "не менее", "от X до Y", "±10", "+-10", "около"), включай всю фразу с единицами измерения.
+Если параметр отсутствует или его значение не может быть корректно извлечено, верни "не указано".
+Если есть дополнительные характеристики, не подходящие под стандартные поля, помести их в поле "Прочее".
+
+Пример 1:
+Входной текст:
+"Наименование продукции: Прожектор светодиодный ASD СДО-2-20 20W или аналог. Энергопотребление, не более, Вт: 20; Входное напряжение: 85-265 В; Цветовая температура, К, не менее: 6500; Коэффициент пульсаций, не более: 5%; Угол свечения: 120°; Степень защиты, не менее IP: 65; Световой поток, Лм: не менее 1600; Габаритные размеры (L, b, h): 178*100*138; Время работы, не менее: 50 000 часов; Кронштейн крепления."
+Вывод:
+{
+  "Номенклатура": "Прожектор светодиодный ASD СДО-2-20 20W или аналог",
+  "Мощность, Вт": "не более 20 Вт",
+  "Св. поток, Лм": "не менее 1600 Лм",
+  "IP": "не менее 65",
+  "Длина, мм": "178",
+  "Ширина, мм": "100",
+  "Высота, мм": "138",
+  "Габариты": "178*100*138",
+  "Рассеиватель": "не указано",
+  "Цвет. температура, К": "не менее 6500",
+  "Вес, кг": "не указано",
+  "Напряжение, В": "85-265 В",
+  "Срок службы (работы) светильника": "не менее 50 000 часов",
+  "Температура эксплуатации": "не указано",
+  "Материал корпуса": "не указано",
+  "Тип": "не указано",
+  "Тип КСС": "120°",
+  "Род тока": "не указано",
+  "Гарантия": "не указано",
+  "Индекс цветопередачи (CRI, Ra)": "не указано",
+  "Класс защиты от поражения электрическим током": "не указано",
+  "Коэффициент мощности (Pf)": "не указано",
+  "С регулятором яркости (диммирование)": "не указано",
+  "Ударопрочность": "не указано",
+  "Класс взрывозащиты (Ex)": "не указано",
+  "Класс пожароопасности": "не указано",
+  "Цвет корпуса": "не указано",
+  "Коэффициент пульсаций": "не указано",
+  "Прочее": "Кронштейн крепления"
+}
+Return only the JSON object.
+    '''
 
 
-def extract_gemma_2_2b_it_IQ3_M(text, initial_prompt, final_columns):
+def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
     llm = Llama(
-        model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-IQ3_M.gguf",
+        model_path="/models/gemma/gemma-2-2b-it-IQ3_M.gguf",
         n_ctx=4096,
         n_gpu_layers=-1,
         
     )
-    prompt = initial_prompt + "\n\nText:\n" + text + "\n\nJSON:"
+    prompt = input_prompt + "\n\nText:\n" + text + "\n\nJSON:"
     output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
     result_text = output["choices"][0]["text"].strip()
     # Извлекаем только JSON-объект с помощью регулярного выражения
@@ -39,35 +80,13 @@ def extract_gemma_2_2b_it_IQ3_M(text, initial_prompt, final_columns):
     return data
 
 
-def extract_gemma_2_2b_it_Q6_K(text, initial_prompt, final_columns):
+def extract_with_mistral(text, final_columns):
     llm = Llama(
-        model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-Q6_K.gguf",
-        n_ctx=8192,
+        model_path="/models/mistral/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf",
+        n_ctx=3072,
         n_gpu_layers=-1,
-        verbose=False
     )
-    prompt = initial_prompt + "\n\nText:\n" + text + "\n\nJSON:"
-    output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
-    result_text = output["choices"][0]["text"].strip()
-    # Извлекаем только JSON-объект с помощью регулярного выражения
-    match = re.search(r'\{.*\}', result_text, re.DOTALL)
-    if match:
-        result_text = match.group(0)
-    try:
-        data = json.loads(result_text)
-    except Exception as e:
-        print("Error parsing JSON:", e)
-        print("Raw output:", result_text)
-        data = {col: "не указано" for col in final_columns}
-    return data
-
-
-def extract_with_mistral(text, initial_prompt):
-    llm = Llama(
-        model_path="../../.lmstudio/models/lmstudio-community/Mistral-7B-Instruct-v0.3-GGUF/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
-        n_ctx=3072
-    )
-    prompt = initial_prompt + "\n\nДанные для обработки:\n" + text
+    prompt = input_prompt + "\n\nДанные для обработки:\n" + text
     output = llm(prompt=prompt, max_tokens=3072, temperature=0.1)
     result_text = output["choices"][0]["text"].strip()
     try:
@@ -75,7 +94,7 @@ def extract_with_mistral(text, initial_prompt):
     except Exception as e:
         print("Error parsing JSON:", e)
         print("Raw output:", result_text)
-        data = {}
+        data = {col: "не указано" for col in final_columns}
     return data
 
 
@@ -83,7 +102,6 @@ def append_df_to_excel(filename, df, sheet_name='Sheet1'):
     # Используем ExcelWriter в режиме добавления (append)
     if os.path.exists(filename):
         with pd.ExcelWriter(filename, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
-            writer.sheets = {ws.title: ws for ws in writer.book.worksheets}
             startrow = writer.sheets[sheet_name].max_row
             df.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=startrow)
     else:
