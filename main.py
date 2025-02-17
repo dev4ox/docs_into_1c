@@ -31,7 +31,7 @@ async def read_root(request: Request):
 async def upload_file(request: Request, file: UploadFile = File(...)):
     upload_folder = Path("uploads")
     upload_folder.mkdir(exist_ok=True)
-    input_file_path = upload_folder / file.filename
+    input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).suffix.lower(), 'input')
     with open(input_file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
@@ -68,16 +68,21 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     df_form = pd.DataFrame(filled_forms, columns=final_columns)
     output_folder = Path("output")
     output_folder.mkdir(exist_ok=True)
-    output_file = output_folder / "Форма_2.xlsx"
+    output_file = output_folder / run_models.generate_filename(ext)
     if not output_file.exists():
         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
     run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
-    return templates.TemplateResponse("result.html", {"request": request, "output_file": str(output_file)})
+    return templates.TemplateResponse("result.html",{
+                                        "request": request,
+                                        "output_file": str(output_file),
+                                        "download_url": f"/download/{output_file.name}"})
 
 
 # Эндпоинт для скачивания файла
-@app.get("/download", response_class=FileResponse)
-async def download_file():
-    file_path = Path("output") / "Форма_2.xlsx"
+@app.get("/download/{filename}", response_class=FileResponse)
+async def download_file(filename: str):
+    file_path = Path("output") / filename
+    if not file_path.exists():
+        return {"error": "Файл не найден"}
     return FileResponse(path=file_path, filename="Форма_2.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

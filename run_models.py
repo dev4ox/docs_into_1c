@@ -4,8 +4,11 @@ from llama_cpp import Llama
 import pandas as pd
 from pathlib import Path
 import re
+import pytesseract
+from pdf2image import convert_from_path
 import pdfplumber
 import collections
+from datetime import datetime
 import settings
 
 
@@ -62,7 +65,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
         model_path="/models/gemma/gemma-2-2b-it-IQ3_M.gguf",
         n_ctx=4096,
         n_gpu_layers=-1,
-        
+        verbose=False,
     )
     prompt = input_prompt + "\n\nText:\n" + text + "\n\nJSON:"
     output = llm(prompt=prompt, max_tokens=512, temperature=0.0)
@@ -79,7 +82,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
         data = {col: "не указано" for col in final_columns}
     return data
 
-
+# Слишком большая
 def extract_with_mistral(text, final_columns):
     llm = Llama(
         model_path="/models/mistral/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf",
@@ -96,6 +99,11 @@ def extract_with_mistral(text, final_columns):
         print("Raw output:", result_text)
         data = {col: "не указано" for col in final_columns}
     return data
+
+
+def generate_filename(ext: str, prefix="Форма2", ):
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    return f"{prefix}-{timestamp}{ext}"
 
 
 def append_df_to_excel(filename, df, sheet_name='Sheet1'):
@@ -195,12 +203,6 @@ class UnifiedExcelParser:
 
     def process(self):
         self.parse_excel()
-
-
-
-
-
-
 
 
 class StructuredPdfParser:
@@ -329,6 +331,18 @@ class StructuredPdfParser2:
                         if any(name.lower() in row_combined.lower() for name in self.PRODUCT_NAMES):
                             product_data = {"text": row_combined}
                             self.data.append(product_data)
+
+# TODO: Доделать распознование картинок из pdf
+        # if not self.data:
+        #     recognition_text = ''
+        #     try:
+        #         pages = convert_from_path(str(self.file_path))
+        #         for page in pages:
+        #             recognition_text += pytesseract.image_to_string(page, lang='rus') + "\n"
+        #     except Exception as e:
+        #         print("OCR error:", e)
+        #     print(recognition_text)
+        #     self.data.append(recognition_text.strip())
 
     def print_data(self):
         if not self.data:

@@ -1,9 +1,7 @@
 import os
 import pandas as pd
 from pathlib import Path
-import re
 import pdfplumber
-import collections
 import pytesseract
 from pdf2image import convert_from_path
 import settings
