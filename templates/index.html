@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Загрузка файла для парсинга</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      width: 80%;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #1e1e1e;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    input[type="file"] {
+      background-color: #2a2a2a;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 10px;
+      border-radius: 5px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    input[type="submit"] {
+      background-color: #6200ee;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    input[type="submit"]:hover {
+      background-color: #3700b3;
+    }
+    .message {
+      color: #ff5252;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Загрузите файл для парсинга</h1>
+    <form action="/upload" enctype="multipart/form-data" method="post">
+      <input name="file" type="file" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
+      <input type="submit" value="Загрузить">
+    </form>
+    {% if message %}
+      <p class="message">{{ message }}</p>
+    {% endif %}
+  </div>
+</body>
+</html>
