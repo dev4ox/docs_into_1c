@@ -63,7 +63,7 @@ input_prompt = '''
     '''
 
 
-# Маленькая для OCR, 3Gb vram, с парсером работает збс!
+# НУЖНО Маленькая для OCR, 3Gb vram, с парсером работает збс!
 def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
     """
     Функция обрабатывает текст с помощью LLM модели Gemma 2, формирует корректный промпт,
@@ -139,13 +139,13 @@ def extract_with_mistral(text, final_columns):
         data = {col: "не указано" for col in final_columns}
     return data
 
-
+# НУЖНО генерирует уникальное имя файла
 def generate_filename(prefix: str="Форма2", ext: str=".xlsx"):
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     return f"{prefix}-{timestamp}{ext}"
 
 
-# Используем ExcelWriter в режиме добавления (append)
+# НУЖНО Используем ExcelWriter в режиме добавления (append)
 def append_df_to_excel(filename, df, sheet_name='Sheet1'):
     if os.path.exists(filename):
         with pd.ExcelWriter(filename, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
@@ -154,7 +154,7 @@ def append_df_to_excel(filename, df, sheet_name='Sheet1'):
     else:
         df.to_excel(filename, index=False, sheet_name=sheet_name)
 
-
+# НУЖНО (не)уникальный парсер excel
 class UnifiedExcelParser:
     PRODUCT_NAMES = settings.product_names
 
@@ -192,6 +192,7 @@ class UnifiedExcelParser:
             for col in df.columns:
                 for row_idx in range(min(15, len(df))):
                     cell_value = str(df.iloc[row_idx, col]).lower() if pd.notna(df.iloc[row_idx, col]) else ""
+# todo: переделать на проверку светильника, а не наименование (пиздец с циклом for)
                     if "наименование" in cell_value:
                         name_column = col
                         break
@@ -202,6 +203,7 @@ class UnifiedExcelParser:
             else:
                 extra_char = (name_column + 2 < df.shape[1])
                 self.parse_multi_column(df, name_column, extra_char)
+
 
     def parse_single_column(self, df):
         current_text = ""
@@ -243,7 +245,7 @@ class UnifiedExcelParser:
     def process(self):
         self.parse_excel()
 
-
+# ХУЙНЯ
 class StructuredDocxParser:
     PRODUCT_NAMES = settings.product_names
 
