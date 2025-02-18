@@ -32,10 +32,13 @@ async def read_root(request: Request):
 async def upload_file(request: Request, file: UploadFile = File(...)):
     upload_folder = Path("uploads")
     upload_folder.mkdir(exist_ok=True)
-    input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).suffix.lower(), 'input')
+    # Сохранение файла в определённом формате
+    input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
+                                                                   Path(file.filename).suffix.lower())
     with open(input_file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Функция определения расширения файла (точка входа в парсер)
     ext = input_file_path.suffix.lower()
     if ext in [".xlsx", ".xls", ".xlsm"]:
         parser = run_models.UnifiedExcelParser(input_file_path)
@@ -43,7 +46,6 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     elif ext in [".doc", ".docx"]:
         parser = run_models.StructuredDocxParser(input_file_path)
         parser.process()
-
     elif ext == ".pdf":
         parser = run_models.StructuredPdfParser2(input_file_path)
         parser.process()
@@ -52,6 +54,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
                                           {"request": request, "message": "Неподдерживаемый формат файла."})
 
     filled_forms = []
+
+    # На вход подаётся список со словарями, где [{"text": "Имя...характеристики"}, ...], 1 словарь = 1 позиция товара
     for product in parser.data:
         product_text = product["text"]
         print(f"Распознанный товар: {product_text=}")
@@ -68,6 +72,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         print(f"Извлечённый товар: {extracted=}")
         filled_forms.append(extracted)
 
+# todo: Сделать проверку DataFrame на наличие более 3-х характеристик, иначе неудачное распознование (к нему error-page)
     df_form = pd.DataFrame(filled_forms, columns=final_columns)
     output_folder = Path("downloads")
     output_folder.mkdir(exist_ok=True)

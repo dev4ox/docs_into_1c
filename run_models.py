@@ -63,7 +63,7 @@ input_prompt = '''
     '''
 
 
-# Маленькая для OCR
+# Маленькая для OCR, 3Gb vram, с парсером работает збс!
 def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
     """
     Функция обрабатывает текст с помощью LLM модели Gemma 2, формирует корректный промпт,
@@ -97,7 +97,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
         data = {col: "не указано" for col in final_columns}
     return data
 
-
+# Не увидел отличий
 def extract_gemma_2_9b_it_Q4_K_M(text, final_columns):
     llm = Llama(
         model_path="/models/gemma/gemma-2-9b-it-Q4_K_M.gguf",
@@ -140,13 +140,13 @@ def extract_with_mistral(text, final_columns):
     return data
 
 
-def generate_filename(ext: str=".xlsx", prefix: str="Форма2"):
+def generate_filename(prefix: str="Форма2", ext: str=".xlsx"):
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     return f"{prefix}-{timestamp}{ext}"
 
 
+# Используем ExcelWriter в режиме добавления (append)
 def append_df_to_excel(filename, df, sheet_name='Sheet1'):
-    # Используем ExcelWriter в режиме добавления (append)
     if os.path.exists(filename):
         with pd.ExcelWriter(filename, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
             startrow = writer.sheets[sheet_name].max_row
