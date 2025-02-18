@@ -1,11 +1,12 @@
+import uvicorn
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+import multiprocessing
 from pathlib import Path
 import pandas as pd
 import shutil
 import run_models
-import settings
 
 
 final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
@@ -40,10 +41,11 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         parser = run_models.UnifiedExcelParser(input_file_path)
         parser.process()
     elif ext in [".doc", ".docx"]:
-        # parser = run_models.(input_file_path)
-        pass
+        parser = run_models.StructuredDocxParser(input_file_path)
+        parser.process()
+
     elif ext == ".pdf":
-        parser = run_models.StructuredPdfParser3(input_file_path)
+        parser = run_models.StructuredPdfParser2(input_file_path)
         parser.process()
     else:
         return templates.TemplateResponse("index.html",
@@ -53,8 +55,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     for product in parser.data:
         product_text = product["text"]
         print(f"Распознанный товар: {product_text=}")
-        # extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
-        extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
+        extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+        # extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
 
         if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
             extracted = {col: "не указано" for col in final_columns}
@@ -87,3 +89,13 @@ async def download_file(filename: str):
     if not file_path.exists():
         return {"error": "Файл не найден"}
     return FileResponse(path=file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def run_server() -> None:
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+if __name__ == "__main__":
+    server = multiprocessing.Process(target=run_server)
+    server.start()
+    server.join()

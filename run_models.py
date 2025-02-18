@@ -1,14 +1,16 @@
+from pathlib import Path
+from datetime import datetime
+from llama_cpp import Llama
+import settings
 import os
 import json
-from llama_cpp import Llama
-import pandas as pd
-from pathlib import Path
 import re
+import collections
+import pandas as pd
+import docx
+import subprocess
 from pdf2image import convert_from_path
 import pdfplumber
-import collections
-from datetime import datetime
-import settings
 
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
@@ -63,19 +65,30 @@ input_prompt = '''
 
 # Маленькая для OCR
 def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
+    """
+    Функция обрабатывает текст с помощью LLM модели Gemma 2, формирует корректный промпт,
+    отправляет запрос и извлекает JSON-ответ.
+    """
     llm = Llama(
         model_path="/models/gemma/gemma-2-2b-it-IQ3_M.gguf",
         n_ctx=8192,
         n_gpu_layers=-1,
         verbose=True,
     )
-    prompt = input_prompt + "\n\nText:\n" + text + "\n\nJSON:"
-    output = llm(prompt=prompt, max_tokens=2048, temperature=0.0)
+    prompt = f"<start_of_turn>user\n{input_prompt}\n\nText:\n{text}\n\nJSON:<end_of_turn>\n<start_of_turn>model\n"
+    output = llm(
+        prompt=prompt,
+        max_tokens=2048,
+        temperature=0.0,
+        stop=["<end_of_turn>"]  # Останавливаем генерацию после ответа
+    )
+
+    # Извлекаем текст и определяем только JSON-объект с помощью регулярного выражения
     result_text = output["choices"][0]["text"].strip()
-    # Извлекаем только JSON-объект с помощью регулярного выражения
     match = re.search(r'\{.*\}', result_text, re.DOTALL)
     if match:
         result_text = match.group(0)
+
     try:
         data = json.loads(result_text)
     except Exception as e:
@@ -88,7 +101,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
 def extract_gemma_2_9b_it_Q4_K_M(text, final_columns):
     llm = Llama(
         model_path="/models/gemma/gemma-2-9b-it-Q4_K_M.gguf",
-        n_ctx=16384,
+        n_ctx=8192,
         n_gpu_layers=-1,
         verbose=True,
     )
@@ -231,7 +244,249 @@ class UnifiedExcelParser:
         self.parse_excel()
 
 
+class StructuredDocxParser:
+    PRODUCT_NAMES = settings.product_names
+
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.data = []
+
+    def parse_table_type1(self, table):
+        """
+        Парсинг таблиц по логике первого парсера:
+        - Если первая ячейка строки соответствует формату "2.5" – новый товар.
+        - Если соответствует формату "2.5.1" – характеристика товара.
+        - Иначе – доп. характеристика.
+        """
+        print("parse_table_type1")
+        results = []
+        current_product = None
+        product_data = {}
+        for row in table.rows:
+            row_text = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+            if not row_text or not row_text[0]:
+                continue
+            # Новый товар (пример: 2.5)
+            if re.match(r"^\d+\.\d+$", row_text[0]):
+                if current_product:
+                    results.append(product_data)
+                current_product = row_text[0]
+                product_data = {"Номенклатура": row_text[0]}
+            # Характеристика товара (пример: 2.5.1)
+            elif re.match(r"^\d+\.\d+\.\d+$", row_text[0]):
+                product_data[row_text[0]] = " | ".join(row_text)
+            else:
+                product_data[f"Характеристика {len(product_data)}"] = " | ".join(row_text)
+        if current_product:
+            results.append(product_data)
+        return results
+
+    def parse_table_type2(self, table):
+        """
+        Парсинг таблиц по логике второго парсера:
+        - Определяется колонка с заголовком, содержащим "наименование".
+        - При нахождении строки с именем товара из PRODUCT_NAMES создаётся новый блок,
+          остальные строки добавляются как характеристики.
+        """
+        print("parse_table_type2")
+        results = []
+        header_cells = table.rows[0].cells
+        name_column = None
+        for col_idx, cell in enumerate(header_cells):
+            if "наименование" in cell.text.lower():
+                name_column = col_idx
+                break
+        if name_column is None:
+            return results
+
+        current_product = None
+        product_data = {}
+        for row in table.rows:
+            row_text = [cell.text.strip().replace("\n", " ").replace("\t", " ") for cell in row.cells]
+            if name_column < len(row_text):
+                product_name = row_text[name_column]
+                if any(name.lower() in product_name.lower() for name in self.PRODUCT_NAMES):
+                    if current_product:
+                        results.append(product_data)
+                    current_product = product_name
+                    product_data = {"text": product_name, "Характеристики": []}
+                elif current_product:
+                    # Здесь происходит объединение строки с существующими данными
+                    # Для корректного объединения преобразуем список в строку, если нужно
+                    additional_text = " ".join(row_text)
+                    if isinstance(product_data.get("Характеристики"), list):
+                        product_data["Характеристики"].append(additional_text)
+                    else:
+                        product_data["Характеристики"] = additional_text
+        if current_product:
+            results.append(product_data)
+        return results
+
+    def parse_table_type3(self, table):
+        """
+        Парсинг таблиц по логике третьего и четвёртого парсеров:
+        - Если объединённый текст строки содержит одно из наименований,
+          строка считается информационной.
+        """
+        print("parse_table_type3")
+        results = []
+        for row in table.rows:
+            row_text = [cell.text.strip().replace("\n", ";").replace("\t", " ") for cell in row.cells]
+            row_combined = " | ".join(row_text)
+            if any(name.lower() in row_combined.lower() for name in self.PRODUCT_NAMES):
+                # Объединяем данные строки в одну строку
+                results.append({"text": row_combined})
+        return results
+
+    def parse_paragraphs(self, doc):
+        """
+        Дополнительная обработка текста вне таблиц (как во втором парсере).
+        Из полного текста ищется фрагмент от наименования до слова "гарантия".
+        """
+        print("parse_paragraphs")
+        results = []
+        full_text = " ".join([p.text for p in doc.paragraphs])
+        lower_text = full_text.lower()
+        for name in self.PRODUCT_NAMES:
+            if name.lower() in lower_text:
+                start_idx = lower_text.find(name.lower())
+                end_idx = lower_text.find("гарантия", start_idx)
+                product_text = full_text[start_idx:end_idx] if end_idx != -1 else full_text[start_idx:]
+                results.append({"text": product_text})
+        return results
+
+    def parse_doc(self):
+        print(f"Opening file: {self.file_path}")
+        if self.file_path.suffix.lower() == ".docx":
+            doc = docx.Document(self.file_path)
+        elif self.file_path.suffix.lower() == ".doc":
+            # Конвертация .doc в .docx с помощью LibreOffice
+            temp_docx = self.file_path.with_suffix('.docx')
+            try:
+                subprocess.run(
+                    ['soffice', '--headless', '--convert-to', 'docx', str(self.file_path), '--outdir',
+                     str(self.file_path.parent)],
+                    check=True
+                )
+            except subprocess.CalledProcessError as e:
+                print("Ошибка при конвертации файла .doc в .docx:", e)
+                return
+            doc = docx.Document(str(temp_docx))
+        else:
+            print("Unsupported file format")
+            return
+
+        # Обработка таблиц
+        for table in doc.tables:
+            # Определяем тип таблицы по первой ячейке первого ряда
+            if table.rows and table.rows[0].cells:
+                first_cell_text = table.rows[0].cells[0].text.lower()
+                if "наименование" in first_cell_text:
+                    table_type = 2
+                elif re.match(r"^\d+\.\d+$", first_cell_text):
+                    table_type = 1
+                else:
+                    table_type = 3
+            else:
+                continue
+
+            if table_type == 1:
+                self.data.extend(self.parse_table_type1(table))
+            elif table_type == 2:
+                self.data.extend(self.parse_table_type2(table))
+            elif table_type == 3:
+                self.data.extend(self.parse_table_type3(table))
+        # Обработка текста вне таблиц
+        self.data.extend(self.parse_paragraphs(doc))
+
+    def _combine_product_data(self, product):
+        """
+        Объединяет все значения словаря продукта в одну строку.
+        Если значение – список, элементы объединяются через пробел.
+        """
+        parts = []
+        for key, value in product.items():
+            if isinstance(value, list):
+                parts.append(" ".join(value))
+            else:
+                parts.append(str(value))
+        return " ".join(parts)
+
+    def format_output(self):
+        """
+        Преобразует self.data в список словарей, где каждый словарь имеет единственный ключ "text",
+        а значение – объединённая строка со всеми данными по товару.
+        """
+        formatted_data = []
+        for product in self.data:
+            combined_text = self._combine_product_data(product)
+            formatted_data.append({"text": combined_text})
+        self.data = formatted_data
+        print(self.data)
+
+    def process(self):
+        if not self.file_path.exists():
+            print(f"File not found: {self.file_path}")
+            return f"File not found: {self.file_path}"
+        print(f"Processing file: {self.file_path.name}")
+        self.parse_doc()
+        self.format_output()
+
+
 class StructuredPdfParser1:
+    PRODUCT_NAMES = settings.product_names
+
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.data = []
+
+    def parse_pdf(self):
+        print(f"Opening file: {self.file_path}")
+        with pdfplumber.open(self.file_path) as pdf:
+            for page_number, page in enumerate(pdf.pages, start=1):
+                tables = page.extract_tables()
+                if not tables:
+                    continue
+
+                for table_idx, table in enumerate(tables):
+                    print(f"Processing table {table_idx + 1} on page {page_number}")
+                    for row in table:
+                        row_text = [str(cell).strip().replace("\n", " ") for cell in row if cell]
+                        row_combined = " | ".join(row_text)
+
+                        # Проверяем, содержится ли в строке название товара
+                        if any(name.lower() in row_combined.lower() for name in self.PRODUCT_NAMES):
+                            product_data = {"text": row_combined}
+                            self.data.append(product_data)
+
+# TODO: Доделать распознование картинок из pdf
+        # if not self.data:
+        #     recognition_text = ''
+        #     try:
+        #         pages = convert_from_path(str(self.file_path))
+        #         for page in pages:
+        #             recognition_text += pytesseract.image_to_string(page, lang='rus') + "\n"
+        #     except Exception as e:
+        #         print("OCR error:", e)
+        #     print(recognition_text)
+        #     self.data.append(recognition_text.strip())
+
+    def print_data(self):
+        if not self.data:
+            print("No data parsed!")
+        for product in self.data:
+            print(product)
+
+    def process(self):
+        if not self.file_path.exists():
+            print(f"File not found: {self.file_path}")
+            return
+
+        print(f"Processing file: {self.file_path.name}")
+        self.parse_pdf()
+
+
+class StructuredPdfParser2:
     PRODUCT_NAMES = settings.product_names
     EXCLUDE_WORDS = ["шт.", "шт", "штук"]
 
@@ -307,14 +562,13 @@ class StructuredPdfParser1:
                                 self.data.append({"text": current_record})
                             current_record = row_combined
                         else:
-                            # Если паттерн установлен и строка соответствует началу нового товара,
-                            # то считаем её новым заголовком
+                            # Если паттерн установлен и строка соответствует началу нового товара, то новый заголовок
                             if self.header_mask and self.is_new_header(row_combined):
                                 if current_record:
                                     self.data.append({"text": current_record})
                                 current_record = row_combined
                             else:
-                                # Иначе, строка считается продолжением предыдущего товара
+                                # Иначе строка считается продолжением предыдущего товара
                                 if current_record:
                                     if current_record.endswith('-'):
                                         current_record = current_record.rstrip('-') + row_combined.lstrip()
@@ -322,59 +576,6 @@ class StructuredPdfParser1:
                                         current_record += " " + row_combined
         if current_record:
             self.data.append({"text": current_record})
-
-    def process(self):
-        if not self.file_path.exists():
-            print(f"File not found: {self.file_path}")
-            return
-
-        print(f"Processing file: {self.file_path.name}")
-        self.parse_pdf()
-
-
-class StructuredPdfParser2:
-    PRODUCT_NAMES = settings.product_names
-
-    def __init__(self, file_path):
-        self.file_path = Path(file_path)
-        self.data = []
-
-    def parse_pdf(self):
-        print(f"Opening file: {self.file_path}")
-        with pdfplumber.open(self.file_path) as pdf:
-            for page_number, page in enumerate(pdf.pages, start=1):
-                tables = page.extract_tables()
-                if not tables:
-                    continue
-
-                for table_idx, table in enumerate(tables):
-                    print(f"Processing table {table_idx + 1} on page {page_number}")
-                    for row in table:
-                        row_text = [str(cell).strip().replace("\n", " ") for cell in row if cell]
-                        row_combined = " | ".join(row_text)
-
-                        # Проверяем, содержится ли в строке название товара
-                        if any(name.lower() in row_combined.lower() for name in self.PRODUCT_NAMES):
-                            product_data = {"text": row_combined}
-                            self.data.append(product_data)
-
-# TODO: Доделать распознование картинок из pdf
-        # if not self.data:
-        #     recognition_text = ''
-        #     try:
-        #         pages = convert_from_path(str(self.file_path))
-        #         for page in pages:
-        #             recognition_text += pytesseract.image_to_string(page, lang='rus') + "\n"
-        #     except Exception as e:
-        #         print("OCR error:", e)
-        #     print(recognition_text)
-        #     self.data.append(recognition_text.strip())
-
-    def print_data(self):
-        if not self.data:
-            print("No data parsed!")
-        for product in self.data:
-            print(product)
 
     def process(self):
         if not self.file_path.exists():
