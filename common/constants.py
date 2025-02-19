@@ -2,11 +2,10 @@ from pathlib import Path
 
 # path | dir
 CWD = Path.cwd()
-DIR_TEST_DATA = Path("..", "test_data", "input")
 DIR_DATA = Path(CWD, "test_data")
 DIR_DATA_INPUT = Path(DIR_DATA, "input")
 DIR_DATA_OUTPUT = Path(DIR_DATA, "output")
-PATH_DATA_OUTPUT_XLSX_FILE = Path(DIR_DATA_OUTPUT, "intermediate.xlsx")
+PATH_DATA_INTERMEDIATE_XLSX_FILE = Path(DIR_DATA_OUTPUT, "intermediate.xlsx")
 
 # synonyms
 PRODUCT_NAMES = ["Светильник", "Прожектор", "Лампа", "Осветительный прибор", "Лам. "]

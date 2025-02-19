@@ -7,6 +7,19 @@ from pathlib import Path
 import pandas as pd
 import shutil
 import run_models
+from pathlib import Path
+import os
+
+from openpyxl import load_workbook
+
+from common.constants import DIR_DATA_INPUT, PATH_DATA_INTERMEDIATE_XLSX_FILE
+from common.helpers import (
+    convert_list_to_string_with_comma,
+    resize_column_in_intermediate_xlsx,
+    create_intermediate_xlsx,
+)
+from parsers.pdf import ParserPDF
+from parsers.doc import DocParser
 
 
 final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
@@ -53,38 +66,40 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         return templates.TemplateResponse("index.html",
                                           {"request": request, "message": "Неподдерживаемый формат файла."})
 
-    filled_forms = []
-
-    # На вход подаётся список со словарями, где [{"text": "Имя...характеристики"}, ...], 1 словарь = 1 позиция товара
-    for product in parser.data:
-        product_text = product["text"]
-        print(f"Распознанный товар: {product_text=}")
-        extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
-        # extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
-
-        if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
-            extracted = {col: "не указано" for col in final_columns}
-        else:
-            # Проверка, что все ключи есть
-            for col in final_columns:
-                if col not in extracted:
-                    extracted[col] = "не указано"
-        print(f"Извлечённый товар: {extracted=}")
-        filled_forms.append(extracted)
+    # filled_forms = []
+    #
+    # # На вход подаётся список со словарями, где [{"text": "Имя...характеристики"}, ...], 1 словарь = 1 позиция товара
+    # for product in parser.data:
+    #     product_text = product["text"]
+    #     print(f"Распознанный товар: {product_text=}")
+    #     extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+    #     # extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
+    #
+    #     if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
+    #         extracted = {col: "не указано" for col in final_columns}
+    #     else:
+    #         # Проверка, что все ключи есть
+    #         for col in final_columns:
+    #             if col not in extracted:
+    #                 extracted[col] = "не указано"
+    #     print(f"Извлечённый товар: {extracted=}")
+    #     filled_forms.append(extracted)
 
 # todo: Сделать проверку DataFrame на наличие более 3-х характеристик, иначе неудачное распознование (к нему error-page)
-    df_form = pd.DataFrame(filled_forms, columns=final_columns)
-    output_folder = Path("downloads")
-    output_folder.mkdir(exist_ok=True)
-    output_file = output_folder / run_models.generate_filename()
-    if not output_file.exists():
-        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
-    run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
-    print(f"\nДанные успешно добавлены в файл {output_file}.")
-    return templates.TemplateResponse("result.html",{
-                                        "request": request,
-                                        "output_file": str(output_file),
-                                        "download_url": f"/download/{output_file.name}"})
+
+#     df_form = pd.DataFrame(filled_forms, columns=final_columns)
+#     output_folder = Path("downloads")
+#     output_folder.mkdir(exist_ok=True)
+#     output_file = output_folder / run_models.generate_filename()
+#     if not output_file.exists():
+#         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
+#     run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
+#     print(f"\nДанные успешно добавлены в файл {output_file}.")
+#     return templates.TemplateResponse("result.html",{
+#                                         "request": request,
+#                                         "output_file": str(output_file),
+#                                         "download_url": f"/download/{output_file.name}"})
+    return None
 
 
 # Эндпоинт для скачивания файла

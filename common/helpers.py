@@ -1,9 +1,12 @@
 from pathlib import Path
 
 from openpyxl import load_workbook
+import pandas as pd
+from spire.doc import Document
+from spire.doc import FileFormat
 
 
-def resize_column_in_output_xlsx(path: Path):
+def resize_column_in_intermediate_xlsx(path: Path) -> None:
     # 🔹 Загружаем созданный файл
     book = load_workbook(path)
     sheet = book.active
@@ -27,6 +30,11 @@ def resize_column_in_output_xlsx(path: Path):
     book.save(path)
 
 
+def create_intermediate_xlsx(path: Path) -> None:
+    df = pd.DataFrame([], columns=["name", "value"])
+    df.to_excel(path, index=False)
+
+
 def convert_list_to_string_with_comma(product_data: dict) -> dict:
     output_dict = {}
 
@@ -34,3 +42,19 @@ def convert_list_to_string_with_comma(product_data: dict) -> dict:
         output_dict[key] = ", ".join(value)
 
     return output_dict
+
+
+def convert_doc_to_docx(path_to_file_doc: Path) -> Path:
+    path_to_file_docx = Path(path_to_file_doc.stem, ".docx")
+
+    # Create an object of the Document class
+    document = Document()
+    # Load a Word DOC file
+    document.LoadFromFile(str(path_to_file_doc))
+
+    # Save the DOC file to DOCX format
+    document.SaveToFile(str(path_to_file_docx), FileFormat.Docx2016)
+    # Close the Document object
+    document.Close()
+
+    return path_to_file_docx
