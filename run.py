@@ -1,14 +1,12 @@
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import multiprocessing
-from pathlib import Path
 import pandas as pd
 import shutil
 import run_models
 from pathlib import Path
-import os
 from common.constants import CWD
 
 import main
@@ -22,6 +20,7 @@ final_columns = ["Номенклатура", "Мощность, Вт", "Св. п
                  "Класс пожароопасности", "Класс защиты от поражения электрическим током",
                  "Материал корпуса", "Тип", "Прочее"]
 
+allowed_extensions = {".doc", ".docx", ".xlsx", ".xls", ".xlsm", ".pdf"}
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -35,32 +34,31 @@ async def read_root(request: Request):
 
 @app.post("/upload", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...)):
-    if not file.filename == '':
-        upload_folder = Path("uploads")
-        upload_folder.mkdir(exist_ok=True)
-        # Сохранение файла в определённом формате
-        input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
-                                                                       Path(file.filename).suffix.lower())
-        print(f"{input_file_path=}")
-        with open(input_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    # Если файл не загружен или неподдерживаемый код файла
+    if not file or not any(file.filename.endswith(ext) for ext in allowed_extensions):
+        return RedirectResponse(url="/?message=Невозможно обработать данный файл", status_code=301)
 
-        # Функция определения расширения файла (точка входа в парсер)
-        ext = input_file_path.suffix.lower()
-        if ext in [".xlsx", ".xls", ".xlsm"]:
-            parser = run_models.UnifiedExcelParser(input_file_path)
-            parser.process()
-        elif ext in [".doc", ".docx", ".pdf"]:
-            main.main(input_file_path)
-            parser = run_models.UnifiedExcelParser(Path(CWD, 'test_data', 'output', 'intermediate.xlsx'))
-            parser.process()
-        else:
-            return templates.TemplateResponse("index.html",
-                                              {"request": request, "message": "Не удалось обработать файл."})
+    upload_folder = Path("uploads")
+    upload_folder.mkdir(exist_ok=True)
+    # Сохранение файла во входящем
+    input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
+                                                                   Path(file.filename).suffix.lower())
+    print(f"{input_file_path=}")
+    with open(input_file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
+    # Функция определения расширения файла (точка входа в парсер)
+    ext = input_file_path.suffix.lower()
+    if ext in [".xlsx", ".xls", ".xlsm"]:
+        parser = run_models.UnifiedExcelParser(input_file_path)
+        parser.process()
+    elif ext in [".doc", ".docx", ".pdf"]:
+        main.main(input_file_path)
+        parser = run_models.UnifiedExcelParser(Path(CWD, 'test_data', 'output', 'intermediate.xlsx'))
+        parser.process()
     else:
         return templates.TemplateResponse("index.html",
-                                          {"request": request, "message": "Неподдерживаемый формат файла."})
+                                          {"request": request, "message": "Не удалось найти парсер."})
 
     filled_forms = []
 
@@ -107,10 +105,10 @@ async def download_file(filename: str):
 
 
 def run_server() -> None:
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("run:app", host="0.0.0.0", port=8000)
 
 
-if __name__ == "__run__":
+if __name__ == "__main__":
     server = multiprocessing.Process(target=run_server)
     server.start()
     server.join()

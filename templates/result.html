@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Загрузка файла для парсинга</title>
+  <title>Обработка завершена</title>
   <style>
     body {
       background-color: #121212;
@@ -22,142 +22,22 @@
       text-align: center;
     }
     h1 {
-      text-align: center;
       margin-bottom: 20px;
     }
-    .drop-zone {
-      border: 2px dashed #6200ee;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 5px;
-      cursor: pointer;
+    a {
+      color: #6200ee;
+      text-decoration: none;
+      font-size: 18px;
     }
-    .drop-zone.dragover {
-      background-color: #333;
-    }
-    .file-info {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #bbb;
-    }
-    .loading {
-      display: none;
-      margin: 15px;
-      font-size: 16px;
-      color: #fff;
-    }
-    input[type="file"] {
-      display: none;
-    }
-    input[type="submit"], input[type="reset"] {
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: background-color 0.3s;
-      margin: 5px;
-    }
-    input[type="submit"] {
-      background-color: #6200ee;
-      color: #fff;
-      border: none;
-    }
-    input[type="submit"]:hover {
-      background-color: #3700b3;
-    }
-    input[type="reset"] {
-      background-color: #a30000;
-      color: #fff;
-      border: none;
-    }
-    input[type="reset"]:hover {
-      background-color: #510000;
-    }
-    .message {
-      color: #ff5252;
-      text-align: center;
-      margin-top: 10px;
+    a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Загрузите файл для парсинга</h1>
-    <form action="/upload" enctype="multipart/form-data" method="post" id="upload-form">
-      <div class="drop-zone" id="drop-zone">Перетащите файл сюда или нажмите для выбора</div>
-      <input name="file" type="file" id="file-input" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
-      <div id="file-info" class="file-info"></div>
-      <div class="buttons">
-        <input type="submit" value="Загрузить" id="submit-button">
-        <input type="reset" value="Очистить" id="reset-button">
-      </div>
-      <div id="loading" class="loading">Файл обрабатывается...</div>
-    </form>
-    {% if message %}
-      <p class="message">{{ message }}</p>
-    {% endif %}
+    <h1>Файл обработан</h1>
+    <p>Скачать обработанный файл: <a href="{{ download_url }}">{{ output_file }}</a></p>
   </div>
-
-  <script>
-    const dropZone = document.getElementById("drop-zone");
-    const fileInput = document.getElementById("file-input");
-    const fileInfo = document.getElementById("file-info");
-    const resetButton = document.getElementById("reset-button");
-    const submitButton = document.getElementById("submit-button");
-    const loading = document.getElementById("loading");
-    const form = document.getElementById("upload-form");
-
-    dropZone.addEventListener("click", () => fileInput.click());
-
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
-    });
-
-    dropZone.addEventListener("dragleave", () => {
-      dropZone.classList.remove("dragover");
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropZone.classList.remove("dragover");
-
-      if (e.dataTransfer.files.length) {
-        fileInput.files = e.dataTransfer.files;
-        fileInfo.textContent = `Загружен файл: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024).toFixed(2)} KB)`;
-      }
-    });
-
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files.length) {
-        fileInfo.textContent = `Загружен файл: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024).toFixed(2)} KB)`;
-      }
-    });
-    if (resetButton.disabled === false) {
-      resetButton.addEventListener("click", () => {
-        fileInput.value = "";
-        fileInfo.textContent = "";
-      });
-    }
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      submitButton.disabled = true;
-      resetButton.disabled = true;
-      loading.style.display = "block";
-
-      try {
-        const match = text.match(/download\/(.*?\.xlsx)/);
-        if (match) {
-          const filename = match[1];
-          window.location.href = `/download/${filename}`;
-        }
-      } catch (error) {
-        loading.textContent = "Ошибка сети. Попробуйте снова.";
-        submitButton.disabled = false;
-        resetButton.disabled = false;
-      }
-    });
-  </script>
 </body>
 </html>

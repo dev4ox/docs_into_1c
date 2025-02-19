@@ -19,31 +19,38 @@
       background-color: #1e1e1e;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      text-align: center;
     }
     h1 {
       text-align: center;
       margin-bottom: 20px;
     }
-    .drop-zone {
-      border: 2px dashed #6200ee;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 5px;
-      cursor: pointer;
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    .drop-zone.dragover {
-      background-color: #333;
-    }
-    .file-info {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #bbb;
-    }
+    /* Скрываем стандартное поле выбора файла */
     input[type="file"] {
       display: none;
     }
-    input[type="submit"], input[type="reset"] {
+    /* Область drag & drop */
+    .drop-area {
+      border: 2px dashed #6200ee;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    .drop-area.dragover {
+      background-color: #2a2a2a;
+    }
+    /* Кнопки */
+    input[type="submit"],
+    input[type="button"].clear-btn {
+      border: none;
       padding: 10px 20px;
       border-radius: 5px;
       cursor: pointer;
@@ -54,85 +61,166 @@
     input[type="submit"] {
       background-color: #6200ee;
       color: #fff;
-      border: none;
     }
     input[type="submit"]:hover {
       background-color: #3700b3;
     }
-    input[type="reset"] {
-      background-color: #a30000;
+    input[type="button"].clear-btn {
+      background-color: #ff5252;
       color: #fff;
-      border: none;
+      font-size: 14px;
     }
-    input[type="reset"]:hover {
-      background-color: #510000;
+    /* Состояние заблокированных кнопок */
+    input[type="submit"]:disabled,
+    input[type="button"]:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+    /* Информация о файле */
+    .file-info {
+      margin-bottom: 10px;
     }
     .message {
       color: #ff5252;
       text-align: center;
       margin-top: 10px;
     }
+    /* Стиль для сообщения об обработке */
+    .processing-message {
+      color: #6200ee;
+      text-align: center;
+      margin-top: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Загрузите файл для парсинга</h1>
-    <form action="/upload" enctype="multipart/form-data" method="post">
-      <div class="drop-zone" id="drop-zone">Перетащите файл сюда или нажмите для выбора</div>
-      <input name="file" type="file" id="file-input" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
-      <div id="file-info" class="file-info"></div>
-      <div class="buttons">
-        <input type="submit" value="Загрузить">
-        <input type="reset" value="Очистить" id="reset-button">
+    <form id="uploadForm" action="/upload" enctype="multipart/form-data" method="post">
+      <div class="drop-area" id="dropArea">
+        <p>Перетащите файл сюда или нажмите для выбора файла</p>
+        <input id="fileInput" name="file" type="file" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
+      </div>
+      <div class="file-info" id="fileInfo"></div>
+      <input type="submit" value="Загрузить" id="submitButton">
+      <input type="button" value="Очистить" id="clearButton" class="clear-btn">
+      <!-- Блок для вывода сообщения об обработке -->
+      <div class="processing-message" id="processingMessage" style="display:none;">
+        Файл обрабатывается, пожалуйста, подождите...
       </div>
     </form>
     {% if message %}
       <p class="message">{{ message }}</p>
     {% endif %}
   </div>
-
   <script>
-    const dropZone = document.getElementById("drop-zone");
-    const fileInput = document.getElementById("file-input");
-    const fileInfo = document.getElementById("file-info");
-    const resetButton = document.getElementById("reset-button");
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const clearButton = document.getElementById('clearButton');
+    const submitButton = document.getElementById('submitButton');
+    const form = document.getElementById('uploadForm');
+    const processingMessage = document.getElementById('processingMessage');
 
-    dropZone.addEventListener("click", () => fileInput.click());
-
-    dropZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
+    // Предотвращаем дефолтное поведение для drag & drop событий
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, e => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
     });
 
-    dropZone.addEventListener("dragleave", () => {
-      dropZone.classList.remove("dragover");
+    // Подсветка области при перетаскивании
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => {
+        dropArea.classList.add('dragover');
+      }, false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => {
+        dropArea.classList.remove('dragover');
+      }, false);
     });
 
-    dropZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dropZone.classList.remove("dragover");
-
-      if (e.dataTransfer.files.length) {
-        const files = e.dataTransfer.files;
-        const dataTransfer = new DataTransfer();
-        for (let i = 0; i < files.length; i++) {
-          dataTransfer.items.add(files[i]);
-        }
-        fileInput.files = dataTransfer.files;
-
-        fileInfo.textContent = `Загружен файл: ${files[0].name} (${(files[0].size / 1024).toFixed(2)} KB)`;
+    // Обработка drop-события: установка файла в скрытый input и отображение информации
+    dropArea.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length) {
+        fileInput.files = files;
+        displayFileInfo(files[0]);
       }
     });
 
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files.length) {
-        fileInfo.textContent = `Загружен файл: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024).toFixed(2)} KB)`;
+    // При клике на область запускаем диалог выбора файла
+    dropArea.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    // Отображение информации о выбранном файле
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        displayFileInfo(e.target.files[0]);
       }
     });
 
-    resetButton.addEventListener("click", () => {
+    function displayFileInfo(file) {
+      fileInfo.textContent = `Выбран файл: ${file.name}, размер: ${Math.round(file.size / 1024)} КБ`;
+    }
+
+    // Кнопка "Очистить": сбрасываем выбор файла и, если есть сообщение (например, об ошибке), перезагружаем страницу
+    clearButton.addEventListener('click', () => {
       fileInput.value = "";
       fileInfo.textContent = "";
+      // Если есть сообщение об ошибке, перезагружаем страницу без параметров
+      if (document.querySelector('.message')) {
+        window.location.href = "/";
+      }
+    });
+
+    // Обработка отправки формы через fetch
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!fileInput.files.length) {
+        alert('Пожалуйста, выберите файл.');
+        return;
+      }
+      // Блокируем кнопки
+      submitButton.disabled = true;
+      clearButton.disabled = true;
+      // Показываем сообщение об обработке
+      processingMessage.style.display = 'block';
+      // Предупреждение при попытке покинуть страницу
+      window.onbeforeunload = function() {
+        return "Обработка файла в процессе. Пожалуйста, дождитесь завершения процесса.";
+      };
+
+      const formData = new FormData(form);
+      try {
+        const response = await fetch(form.action, {
+          method: form.method,
+          body: formData,
+          redirect: 'manual'
+        });
+        // Если сервер возвращает код 303 – редирект с ошибкой
+        if (response.status === 303) {
+          // Получаем URL для редиректа, в котором передано сообщение об ошибке
+          const redirectUrl = response.headers.get("location");
+          // Перенаправляем браузер на страницу с сообщением об ошибке
+          window.location.href = redirectUrl;
+        } else {
+          // Если обработка прошла успешно, получаем HTML результата и заменяем содержимое страницы
+          const html = await response.text();
+          document.open();
+          document.write(html);
+          document.close();
+        }
+      } catch (error) {
+        console.error("Ошибка при отправке файла:", error);
+      } finally {
+        window.onbeforeunload = null;
+      }
     });
   </script>
 </body>
