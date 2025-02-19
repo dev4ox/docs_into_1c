@@ -1,17 +1,9 @@
-import uvicorn
-from fastapi import FastAPI, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-import multiprocessing
-from pathlib import Path
-import pandas as pd
-import shutil
-import run_models
 from pathlib import Path
 import os
 
 from openpyxl import load_workbook
 
+import common.constants
 from common.constants import DIR_DATA_INPUT, PATH_DATA_INTERMEDIATE_XLSX_FILE
 from common.helpers import (
     convert_list_to_string_with_comma,
@@ -22,100 +14,62 @@ from parsers.pdf import ParserPDF
 from parsers.doc import DocParser
 
 
-final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
-                 "Ширина, мм", "Высота, мм", "Рассеиватель", "Цвет. температура, К", "Вес, кг",
-                 "Напряжение, В", "Температура эксплуатации", "Срок службы (работы) светильника",
-                 "Тип КСС", "Род тока", "Гарантия", "Индекс цветопередачи (CRI, Ra)", "Цвет корпуса",
-                 "Коэффициент пульсаций", "Коэффициент мощности (Pf)", "Класс взрывозащиты (Ex)",
-                 "Класс пожароопасности", "Класс защиты от поражения электрическим током",
-                 "Материал корпуса", "Тип", "Прочее"]
+def activate_parsers(path_to_file: Path) -> None:
+    file_type = path_to_file.suffix
 
+    if file_type == ".pdf":
+        parser_data = ParserPDF(path_to_file)
+        print(f"\nПарс файла {path_to_file} - окончен успешно!\n")
 
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+    elif file_type == ".docx" or file_type == ".doc":
+        parser_data = DocParser(path_to_file)
+        print(f"\nПарс файла {path_to_file} - окончен успешно!\n")
 
-
-# Главная страница
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.post("/upload", response_class=HTMLResponse)
-async def upload_file(request: Request, file: UploadFile = File(...)):
-    upload_folder = Path("uploads")
-    upload_folder.mkdir(exist_ok=True)
-    # Сохранение файла в определённом формате
-    input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
-                                                                   Path(file.filename).suffix.lower())
-    with open(input_file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Функция определения расширения файла (точка входа в парсер)
-    ext = input_file_path.suffix.lower()
-    if ext in [".xlsx", ".xls", ".xlsm"]:
-        parser = run_models.UnifiedExcelParser(input_file_path)
-        parser.process()
-    elif ext in [".doc", ".docx"]:
-        parser = run_models.StructuredDocxParser(input_file_path)
-        parser.process()
-    elif ext == ".pdf":
-        parser = run_models.StructuredPdfParser2(input_file_path)
-        parser.process()
     else:
-        return templates.TemplateResponse("index.html",
-                                          {"request": request, "message": "Неподдерживаемый формат файла."})
+        parser_data = {}
+        print(f"\nНеизвестный формат файла: {file_type}\n")
 
-    # filled_forms = []
-    #
-    # # На вход подаётся список со словарями, где [{"text": "Имя...характеристики"}, ...], 1 словарь = 1 позиция товара
-    # for product in parser.data:
-    #     product_text = product["text"]
-    #     print(f"Распознанный товар: {product_text=}")
-    #     extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
-    #     # extracted = run_models.extract_gemma_2_9b_it_Q4_K_M(product_text, final_columns)
-    #
-    #     if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
-    #         extracted = {col: "не указано" for col in final_columns}
-    #     else:
-    #         # Проверка, что все ключи есть
-    #         for col in final_columns:
-    #             if col not in extracted:
-    #                 extracted[col] = "не указано"
-    #     print(f"Извлечённый товар: {extracted=}")
-    #     filled_forms.append(extracted)
-
-# todo: Сделать проверку DataFrame на наличие более 3-х характеристик, иначе неудачное распознование (к нему error-page)
-
-#     df_form = pd.DataFrame(filled_forms, columns=final_columns)
-#     output_folder = Path("downloads")
-#     output_folder.mkdir(exist_ok=True)
-#     output_file = output_folder / run_models.generate_filename()
-#     if not output_file.exists():
-#         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
-#     run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
-#     print(f"\nДанные успешно добавлены в файл {output_file}.")
-#     return templates.TemplateResponse("result.html",{
-#                                         "request": request,
-#                                         "output_file": str(output_file),
-#                                         "download_url": f"/download/{output_file.name}"})
-    return None
+    print(f"\nСохранение результатов парса в промежуточный файл")
+    save_data_to_excel(parser_data, PATH_DATA_INTERMEDIATE_XLSX_FILE)
 
 
-# Эндпоинт для скачивания файла
-@app.get("/download/{filename}", response_class=FileResponse)
-async def download_file(filename: str):
-    file_path = Path("downloads") / filename
-    if not file_path.exists():
-        return {"error": "Файл не найден"}
-    return FileResponse(path=file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+def save_data_to_excel(product_data: dict, path: Path) -> None:
+    product_data = convert_list_to_string_with_comma(product_data)
+
+    book = load_workbook(path)
+    sheet = book.active
+
+    # 🔹 Добавляем новую строку
+    for name, value in product_data.items():
+        sheet.append([name, value])
+
+    # 🔹 Сохраняем изменения
+    book.save(path)
+
+    resize_column_in_intermediate_xlsx(path)
+    print("Результаты парса сохранены!\n")
 
 
-def run_server() -> None:
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+def main(input_file_path: Path | None = None) -> None:
+    print(f"Промежуточный файл создан: {PATH_DATA_INTERMEDIATE_XLSX_FILE}\n")
+    create_intermediate_xlsx(PATH_DATA_INTERMEDIATE_XLSX_FILE)
+    if input_file_path:
+        activate_parsers(input_file_path)
+    else:
+        paths_to_input_data = DIR_DATA_INPUT.glob("*.*")
+
+        for path in paths_to_input_data:
+            print(f"\nЗапуск парса файла: {path}\n")
+            activate_parsers(path)
 
 
 if __name__ == "__main__":
-    server = multiprocessing.Process(target=run_server)
-    server.start()
-    server.join()
+    try:
+        main(Path(common.constants.CWD, 'uploads', 'ТЗ для Рос Волга-2025-02-19-11-19-07.doc'))
+
+    except KeyboardInterrupt:
+        os.remove(PATH_DATA_INTERMEDIATE_XLSX_FILE)
+
+    except Exception as e:
+        print(e)
+        os.remove(PATH_DATA_INTERMEDIATE_XLSX_FILE)

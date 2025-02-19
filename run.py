@@ -1,19 +1,26 @@
+import uvicorn
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+import multiprocessing
 from pathlib import Path
-import shutil
 import pandas as pd
-from parsers import (
-    StructuredPdfParser,
-    extract_text_from_docx,
-    UnifiedExcelParser,
-    append_df_to_excel,
-    final_columns
-)
-from run_models import (
-    extract_with_mistral
-)
+import shutil
+import run_models
+from pathlib import Path
+import os
+from common.constants import CWD
+
+import main
+
+
+final_columns = ["Номенклатура", "Мощность, Вт", "Св. поток, Лм", "IP", "Габариты", "Длина, мм",
+                 "Ширина, мм", "Высота, мм", "Рассеиватель", "Цвет. температура, К", "Вес, кг",
+                 "Напряжение, В", "Температура эксплуатации", "Срок службы (работы) светильника",
+                 "Тип КСС", "Род тока", "Гарантия", "Индекс цветопередачи (CRI, Ra)", "Цвет корпуса",
+                 "Коэффициент пульсаций", "Коэффициент мощности (Pf)", "Класс взрывозащиты (Ex)",
+                 "Класс пожароопасности", "Класс защиты от поражения электрическим током",
+                 "Материал корпуса", "Тип", "Прочее"]
 
 
 app = FastAPI()
@@ -25,54 +32,85 @@ templates = Jinja2Templates(directory="templates")
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Эндпоинт загрузки файла
+
 @app.post("/upload", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...)):
-    upload_folder = Path("uploads")
-    upload_folder.mkdir(exist_ok=True)
-    file_path = upload_folder / file.filename
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    ext = file_path.suffix.lower()
-    if ext in [".xlsx", ".xls", ".xlsm"]:
-        extracted_text = UnifiedExcelParser(file_path)
-        extracted_text.process()
-    elif ext in [".doc", ".docx"]:
-        extracted_text = extract_text_from_docx(file_path)
-    elif ext == ".pdf":
-        extracted_text = StructuredPdfParser(file_path)
-        extracted_text.process()
+    if not file.filename == '':
+        upload_folder = Path("uploads")
+        upload_folder.mkdir(exist_ok=True)
+        # Сохранение файла в определённом формате
+        input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
+                                                                       Path(file.filename).suffix.lower())
+        print(f"{input_file_path=}")
+        with open(input_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Функция определения расширения файла (точка входа в парсер)
+        ext = input_file_path.suffix.lower()
+        if ext in [".xlsx", ".xls", ".xlsm"]:
+            parser = run_models.UnifiedExcelParser(input_file_path)
+            parser.process()
+        elif ext in [".doc", ".docx", ".pdf"]:
+            main.main(input_file_path)
+            parser = run_models.UnifiedExcelParser(Path(CWD, 'test_data', 'output', 'intermediate.xlsx'))
+            parser.process()
+        else:
+            return templates.TemplateResponse("index.html",
+                                              {"request": request, "message": "Не удалось обработать файл."})
+
     else:
-        return templates.TemplateResponse("index.html", {"request": request, "message": "Неподдерживаемый формат файла."})
-    
-    # Передаём извлечённый текст в LLM для получения JSON с параметрами.
-    # Если в тексте несколько товаров (например, для Excel), можно реализовать итерацию – здесь для простоты объединяем в один текст.
-    result_json = extract_with_mistral(extracted_text.print_data())
-    
-    # Если LLM вернула пустой словарь, заменяем дефолтными значениями.
-    if not result_json or not isinstance(result_json, dict) or len(result_json) == 0:
-        result_json = {col: "не указано" for col in final_columns}
-    else:
-        for col in final_columns:
-            if col not in result_json:
-                result_json[col] = "не указано"
-    
-    # Создаем DataFrame из результата
-    df_result = pd.DataFrame([result_json], columns=final_columns)
-    
-    # Сохраняем или дописываем результат в файл "Форма_2.xlsx" в папке "downloads"
+        return templates.TemplateResponse("index.html",
+                                          {"request": request, "message": "Неподдерживаемый формат файла."})
+
+    filled_forms = []
+
+    # На вход подаётся список со словарями, где [{"text": "Имя...характеристики"}, ...], 1 словарь = 1 позиция товара
+    for product in parser.data:
+        product_text = product["text"]
+        print(f"Распознанный товар: {product_text=}")
+        extracted = run_models.extract_gemma_2_2b_it_IQ3_M_win(product_text, final_columns)
+        # extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+
+        if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
+            extracted = {col: "не указано" for col in final_columns}
+        else:
+            # Проверка, что все ключи есть
+            for col in final_columns:
+                if col not in extracted:
+                    extracted[col] = "не указано"
+        print(f"Извлечённый товар: {extracted=}")
+        filled_forms.append(extracted)
+
+# todo: Сделать проверку DataFrame на наличие более 3-х характеристик, иначе неудачное распознование (к нему error-page)
+
+    df_form = pd.DataFrame(filled_forms, columns=final_columns)
     output_folder = Path("downloads")
     output_folder.mkdir(exist_ok=True)
-    output_file = output_folder / "Форма_2.xlsx"
+    output_file = output_folder / run_models.generate_filename()
     if not output_file.exists():
         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
-    append_df_to_excel(str(output_file), df_result, sheet_name="Sheet1")
-    
-    return templates.TemplateResponse("result.html", {"request": request, "output_file": str(output_file)})
+    run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
+    print(f"\nДанные успешно добавлены в файл {output_file}.")
+    return templates.TemplateResponse("result.html",{
+                                        "request": request,
+                                        "output_file": str(output_file),
+                                        "download_url": f"/download/{output_file.name}"})
+
 
 # Эндпоинт для скачивания файла
-@app.get("/download", response_class=FileResponse)
-async def download_file():
-    file_path = Path("downloads") / "Форма_2.xlsx"
-    return FileResponse(path=file_path, filename="Форма_2.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+@app.get("/download/{filename}", response_class=FileResponse)
+async def download_file(filename: str):
+    file_path = Path("downloads") / filename
+    if not file_path.exists():
+        return {"error": "Файл не найден"}
+    return FileResponse(path=file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def run_server() -> None:
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+if __name__ == "__run__":
+    server = multiprocessing.Process(target=run_server)
+    server.start()
+    server.join()

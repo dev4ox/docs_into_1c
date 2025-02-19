@@ -5,15 +5,8 @@ import settings
 import os
 import json
 import re
-import collections
 import pandas as pd
-import docx
-import subprocess
-from pdf2image import convert_from_path
-import pdfplumber
 
-# import pytesseract
-# pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 input_prompt = '''
 Задача – анализ текста и извлечение параметров.
@@ -97,21 +90,33 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
         data = {col: "не указано" for col in final_columns}
     return data
 
-# Не увидел отличий
-def extract_gemma_2_9b_it_Q4_K_M(text, final_columns):
+
+# НУЖНО для windows (llm из lmstudio локального пользователя)
+def extract_gemma_2_2b_it_IQ3_M_win(text, final_columns):
+    """
+    Функция обрабатывает текст с помощью LLM модели Gemma 2, формирует корректный промпт,
+    отправляет запрос и извлекает JSON-ответ.
+    """
     llm = Llama(
-        model_path="/models/gemma/gemma-2-9b-it-Q4_K_M.gguf",
+        model_path="../../.lmstudio/models/lmstudio-community/gemma-2-2b-it-GGUF/gemma-2-2b-it-IQ3_M.gguf",
         n_ctx=8192,
         n_gpu_layers=-1,
-        verbose=True,
+        verbose=False,
     )
-    prompt = input_prompt + "\n\nText:\n" + text + "\n\nJSON:"
-    output = llm(prompt=prompt, max_tokens=4096, temperature=0.0)
+    prompt = f"<start_of_turn>user\n{input_prompt}\n\nText:\n{text}\n\nJSON:<end_of_turn>\n<start_of_turn>model\n"
+    output = llm(
+        prompt=prompt,
+        max_tokens=2048,
+        temperature=0.0,
+        stop=["<end_of_turn>"]  # Останавливаем генерацию после ответа
+    )
+
+    # Извлекаем текст и определяем только JSON-объект с помощью регулярного выражения
     result_text = output["choices"][0]["text"].strip()
-    # Извлекаем только JSON-объект с помощью регулярного выражения
     match = re.search(r'\{.*\}', result_text, re.DOTALL)
     if match:
         result_text = match.group(0)
+
     try:
         data = json.loads(result_text)
     except Exception as e:
