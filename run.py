@@ -87,9 +87,10 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     output_filename = run_models.generate_filename()
     output_file = output_folder / output_filename
     if not output_file.exists():
-        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
-    run_models.append_df_to_excel(output_file, df_form_filtered, sheet_name="filtered")
-    run_models.append_df_to_excel(output_file, df_form, sheet_name="all")
+        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Filtered")
+        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="All")
+    run_models.append_df_to_excel(output_file, df_form_filtered, sheet_name="Filtered")
+    run_models.append_df_to_excel(output_file, df_form, sheet_name="All")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
     return templates.TemplateResponse("result.html",{
                                         "request": request,
