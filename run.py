@@ -86,9 +86,13 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     output_folder.mkdir(exist_ok=True)
     output_filename = run_models.generate_filename()
     output_file = output_folder / output_filename
-    if not output_file.exists():
-        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Filtered")
-        pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="All")
+    # if not output_file.exists():
+    #     pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Filtered")
+    #     pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="All")
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        df_form_filtered.to_excel(writer, index=False, sheet_name="Filtered", columns=final_columns)
+        df_form.to_excel(writer, index=False, sheet_name="All", columns=final_columns)
+
     run_models.append_df_to_excel(output_file, df_form_filtered, sheet_name="Filtered")
     run_models.append_df_to_excel(output_file, df_form, sheet_name="All")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
