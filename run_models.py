@@ -54,7 +54,7 @@ input_prompt = '''
   "Коэффициент пульсаций": "не указано",
   "Прочее": "Кронштейн крепления"
 }
-    '''
+'''
 
 
 # НУЖНО Маленькая для OCR, 3Gb vram, с парсером работает збс!
@@ -64,7 +64,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
     отправляет запрос и извлекает JSON-ответ.
     """
     llm = Llama(
-        model_path=DIR_MODELS.joinpath("lmstudio-community", "gemma-2-2b-it-GGUF", "gemma-2-2b-it-IQ3_M.gguf"),
+        model_path=str(DIR_MODELS.joinpath("lmstudio-community", "gemma-2-2b-it-GGUF", "gemma-2-2b-it-IQ3_M.gguf")),
         n_ctx=8192,
         n_gpu_layers=-1,
         verbose=True,

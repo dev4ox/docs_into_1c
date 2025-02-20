@@ -66,8 +66,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     for product in parser.data:
         product_text = product["text"]
         print(f"Распознанный товар: {product_text=}")
-        extracted = run_models.extract_gemma_2_2b_it_IQ3_M_win(product_text, final_columns)
-        # extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
+        extracted = run_models.extract_gemma_2_2b_it_IQ3_M(product_text, final_columns)
 
         if not extracted or not isinstance(extracted, dict) or len(extracted) == 0:
             extracted = {col: "не указано" for col in final_columns}

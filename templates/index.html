@@ -41,13 +41,17 @@
       text-align: center;
       cursor: pointer;
       transition: background-color 0.3s;
-      width: 100%;
-      margin-bottom: 20px;
+      width: 90%;
+      margin: 20px;
     }
     .drop-area.dragover {
       background-color: #2a2a2a;
     }
     /* Кнопки */
+    .form-buttons {
+        display: flex;
+        justify-content: space-between;
+    }
     input[type="submit"],
     input[type="button"].clear-btn {
       border: none;
@@ -66,9 +70,12 @@
       background-color: #3700b3;
     }
     input[type="button"].clear-btn {
-      background-color: #ff5252;
+      background-color: #bc1818;
       color: #fff;
       font-size: 14px;
+    }
+    input[type="button"].clear-btn:hover {
+        background-color: #810e0e;
     }
     /* Состояние заблокированных кнопок */
     input[type="submit"]:disabled,
@@ -99,16 +106,16 @@
     <h1>Загрузите файл для парсинга</h1>
     <form id="uploadForm" action="/upload" enctype="multipart/form-data" method="post">
       <div class="drop-area" id="dropArea">
-        <p>Перетащите файл сюда или нажмите для выбора файла</p>
-        <input id="fileInput" name="file" type="file" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
+            <p>Перетащите файл сюда или нажмите для выбора файла</p>
+            <input id="fileInput" name="file" type="file" accept=".doc,.docx,.xlsx,.xls,.xlsm,.pdf">
       </div>
       <div class="file-info" id="fileInfo"></div>
-      <input type="submit" value="Загрузить" id="submitButton">
-      <input type="button" value="Очистить" id="clearButton" class="clear-btn">
-      <!-- Блок для вывода сообщения об обработке -->
-      <div class="processing-message" id="processingMessage" style="display:none;">
-        Файл обрабатывается, пожалуйста, подождите...
+      <div class="form-buttons">
+          <input type="submit" value="Загрузить" id="submitButton">
+          <input type="button" value="Очистить" id="clearButton" class="clear-btn">
       </div>
+      <!-- Блок для вывода сообщения об обработке -->
+      <div class="processing-message" id="processingMessage" style="display:none;">Файл обрабатывается, пожалуйста, подождите...</div>
     </form>
     {% if message %}
       <p class="message">{{ message }}</p>
