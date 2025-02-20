@@ -1,8 +1,8 @@
 uploads/
-
 test/
 test_data/
 models/
+common/constants_prod.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
