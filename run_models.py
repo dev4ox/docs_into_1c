@@ -67,7 +67,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
         model_path=str(DIR_MODELS.joinpath("lmstudio-community", "gemma-2-2b-it-GGUF", "gemma-2-2b-it-IQ3_M.gguf")),
         n_ctx=8192,
         n_gpu_layers=-1,
-        verbose=True,
+        verbose=False,
     )
     prompt = f"<start_of_turn>user\n{input_prompt}\n\nText:\n{text}\n\nJSON:<end_of_turn>\n<start_of_turn>model\n"
     output = llm(
@@ -96,6 +96,14 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
 def generate_filename(prefix: str="Форма2", ext: str=".xlsx"):
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     return f"{prefix}-{timestamp}{ext}"
+
+
+def out_filter_dataframe(df: pd.DataFrame, min_characteristics: int = 4) -> pd.DataFrame:
+    def count_valid_chars(row):
+        return sum(1 for value in row if str(value).strip().lower() != "не указано" and pd.notna(value))
+
+    filtered_df = df[df.apply(count_valid_chars, axis=1) >= min_characteristics]
+    return filtered_df
 
 
 # НУЖНО Используем ExcelWriter в режиме добавления (append)

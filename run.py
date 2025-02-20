@@ -78,15 +78,15 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         print(f"Извлечённый товар: {extracted=}")
         filled_forms.append(extracted)
 
-# todo: Сделать проверку DataFrame на наличие более 3-х характеристик, иначе неудачное распознование (к нему error-page)
-
-    df_form = pd.DataFrame(filled_forms, columns=final_columns)
+    df_form_in = pd.DataFrame(filled_forms, columns=final_columns)
+    # ФИЛЬТР!!!
+    df_form_out = run_models.out_filter_dataframe(df_form_in)
     output_folder = Path("downloads")
     output_folder.mkdir(exist_ok=True)
     output_file = output_folder / run_models.generate_filename()
     if not output_file.exists():
         pd.DataFrame(columns=final_columns).to_excel(output_file, index=False, sheet_name="Sheet1")
-    run_models.append_df_to_excel(output_file, df_form, sheet_name="Sheet1")
+    run_models.append_df_to_excel(output_file, df_form_out, sheet_name="Sheet1")
     print(f"\nДанные успешно добавлены в файл {output_file}.")
     return templates.TemplateResponse("result.html",{
                                         "request": request,
