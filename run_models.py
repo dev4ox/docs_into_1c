@@ -58,7 +58,7 @@ input_prompt = '''
 
 
 # НУЖНО Маленькая для OCR, 3Gb vram, с парсером работает збс!
-def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
+def extract_gemma_2_2b_it_IQ3_M(text, final_columns) -> dict:
     """
     Функция обрабатывает текст с помощью LLM модели Gemma 2, формирует корректный промпт,
     отправляет запрос и извлекает JSON-ответ.
@@ -93,7 +93,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns):
 
 
 # НУЖНО генерирует уникальное имя файла
-def generate_filename(prefix: str="Форма2", ext: str=".xlsx"):
+def generate_filename(prefix: str="Форма2", ext: str=".xlsx") -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     return f"{prefix}-{timestamp}{ext}"
 
