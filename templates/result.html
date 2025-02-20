@@ -25,19 +25,34 @@
       margin-bottom: 20px;
     }
     a {
-      color: #6200ee;
+      color: #5f75ff;
       text-decoration: none;
       font-size: 18px;
     }
     a:hover {
       text-decoration: underline;
     }
+    .to-main-button {
+      margin: 20px auto;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+      background-color: #7e4900;
+      color: #fff;
+    }
+    .to-main-button:hover {
+      background-color: #553200;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Файл обработан</h1>
-    <p>Скачать обработанный файл: <a href="{{ download_url }}">{{ output_file }}</a></p>
+    <p>Скачать: <a href="{{ download_url }}">{{ output_file }}</a></p>
+      <a href="/" class="to-main-button">Назад</a>
   </div>
 </body>
 </html>
