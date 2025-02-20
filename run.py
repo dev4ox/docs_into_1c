@@ -98,8 +98,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     print(f"\nДанные успешно добавлены в файл {output_file}.")
     return templates.TemplateResponse("result.html",{
                                         "request": request,
-                                        "output_file": str(output_file),
-                                        "download_url": output_filename})
+                                        "output_file": str(output_filename),
+                                        "download_url": f'/download/{output_file}'})
 
 
 # Эндпоинт для скачивания файла
