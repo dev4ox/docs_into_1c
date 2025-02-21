@@ -97,3 +97,26 @@ SYNONYMS = {
         "коэффициент пульсаций", "пульсация светового потока", "значение пульсации"
     ]
 }
+
+import pandas as pd
+from common.constants import SYNONYMS
+
+def count_valid_chars(row):
+    return sum(1 for value in row if str(value).strip().lower() != "не указано" and pd.notna(value))
+
+def determine_min_characteristics(df: pd.DataFrame) -> int:
+    valid_counts = df.apply(count_valid_chars, axis=1)
+    avg_chars = valid_counts.mean()
+    min_chars = max(2, int(avg_chars * 0.6))  # Минимум 60% от среднего количества характеристик
+    return min_chars
+
+def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    synonym_map = {synonym.lower(): key for key, synonyms in SYNONYMS.items() for synonym in synonyms}
+    df.columns = [synonym_map.get(col.lower(), col) for col in df.columns]
+    return df
+
+def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df = normalize_column_names(df)
+    min_characteristics = determine_min_characteristics(df)
+    filtered_df = df[df.apply(count_valid_chars, axis=1) >= min_characteristics]
+    return filtered_df

@@ -95,7 +95,7 @@ def extract_gemma_2_2b_it_IQ3_M(text, final_columns) -> dict:
 # НУЖНО генерирует уникальное имя файла
 def generate_filename(prefix: str="Форма2", ext: str=".xlsx") -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    return f"{prefix}-{timestamp}{ext}"
+    return f"{timestamp}-{prefix}{ext}"
 
 
 def out_filter_dataframe(df: pd.DataFrame, min_characteristics: int = 4) -> pd.DataFrame:
