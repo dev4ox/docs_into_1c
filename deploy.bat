@@ -1,0 +1,1 @@
+ssh root@192.168.1.35 -p 2222 "su netuser && bash /var/www/docs_into_1c deploy.sh"
