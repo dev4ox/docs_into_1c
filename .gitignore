@@ -4,6 +4,7 @@ test_data/
 models/
 common/constants_prod.py
 deploy.bat
+deploy.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

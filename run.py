@@ -39,7 +39,6 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
 
     upload_folder = Path("uploads")
     upload_folder.mkdir(exist_ok=True)
-    # Сохранение файла во входящем
     input_file_path = upload_folder / run_models.generate_filename(Path(file.filename).stem,
                                                                    Path(file.filename).suffix.lower())
     print(f"{input_file_path=}")
