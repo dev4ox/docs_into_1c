@@ -45,7 +45,7 @@ def convert_list_to_string_with_comma(product_data: dict) -> dict:
 
 
 def convert_doc_to_docx(path_to_file_doc: Path) -> Path:
-    path_to_file_docx = Path(path_to_file_doc.stem, ".docx")
+    path_to_file_docx = path_to_file_doc.with_suffix(".docx")
 
     # Create an object of the Document class
     document = Document()
