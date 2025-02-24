@@ -26,16 +26,16 @@ templates = Jinja2Templates(directory="templates")
 
 
 # Главная страница
-@app.get("/", response_class=HTMLResponse)
+@app.get("/v1/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/upload", response_class=HTMLResponse)
+@app.post("/v1/upload", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...)):
     # Если файл не загружен или неподдерживаемый код файла
     if not file or not any(file.filename.endswith(ext) for ext in allowed_extensions):
-        return RedirectResponse(url="/?message=Невозможно обработать данный файл", status_code=301)
+        return RedirectResponse(url="/?message=Невозможно обработать данный файл", status_code=401)
 
     upload_folder = Path("uploads")
     upload_folder.mkdir(exist_ok=True)
@@ -97,11 +97,11 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     return templates.TemplateResponse("result.html",{
                                         "request": request,
                                         "output_file": str(output_filename),
-                                        "download_url": f'/download/{output_filename}'})
+                                        "download_url": f'/v1/download/{output_filename}'})
 
 
 # Эндпоинт для скачивания файла
-@app.get("/download/{filename}", response_class=FileResponse)
+@app.get("/v1/download/{filename}", response_class=FileResponse)
 async def download_file(filename: str):
     file_path = Path("downloads") / filename
     if not file_path.exists():
