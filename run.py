@@ -26,12 +26,12 @@ templates = Jinja2Templates(directory="templates")
 
 
 # Главная страница
-@app.get("/v1/", response_class=HTMLResponse)
+@app.get("/old/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/v1/upload", response_class=HTMLResponse)
+@app.post("/old/upload", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...)):
     # Если файл не загружен или неподдерживаемый код файла
     if not file or not any(file.filename.endswith(ext) for ext in allowed_extensions):
@@ -97,11 +97,11 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     return templates.TemplateResponse("result.html",{
                                         "request": request,
                                         "output_file": str(output_filename),
-                                        "download_url": f'/v1/download/{output_filename}'})
+                                        "download_url": f'/old/download/{output_filename}'})
 
 
 # Эндпоинт для скачивания файла
-@app.get("/v1/download/{filename}", response_class=FileResponse)
+@app.get("/old/download/{filename}", response_class=FileResponse)
 async def download_file(filename: str):
     file_path = Path("downloads") / filename
     if not file_path.exists():
